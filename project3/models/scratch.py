@@ -1,3 +1,4 @@
+import time
 import tensorflow as tf
 import numpy as np
 
@@ -244,8 +245,8 @@ class vgg16:
 10])
         self.convlayers()
         self.fc_layers()
-        self.probs = tf.nn.softmax(self.fc3l)
-        cross_entropy = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(labels=self.y_, logits=self.probs))
+        self.logits = self.fc3l
+        cross_entropy = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(labels=self.y_, logits=self.logits))
         self.train_step = tf.train.AdamOptimizer(self.lr).minimize(cross_entropy)
 
     def train(self, X_train, Y_train, eval_set=None, epochs=1, early_stopping=None):
@@ -255,28 +256,35 @@ class vgg16:
         X_test, Y_test = eval_set
         if self.pred_mbs is None: self.pred_mbs = X_test.shape[0]
         n_train = X_train.shape[0]
+        n_batches = int(np.ceil(n_train/self.mbs))
+        mb_progress = int(0.1*n_batches)
         indices = np.arange(X_train.shape[0])
         accs = []
         if early_stopping is None: early_stopping = epochs+1
         for epoch in range(epochs):
             print("Epoch ", epoch, " . . . ")
+            time_0 = time.time()
             np.random.shuffle(indices)
             X = X_train[indices]
             Y = Y_train[indices]
-            for i in range(0,n_train,self.mbs):
+            time_1 = time.time()
+            for k, i in enumerate(range(0,n_train,self.mbs)):
+                if k%mb_progress == 0:
+                    print(k, "/", n_batches, " batches (", np.round(time.time()-time_1, 5), " s)")
+                    time_1 = time.time()
                 X_batch, Y_batch = X[i:min(n_train,i+self.mbs)], Y[i:min(n_train,i+self.mbs)]
                 self.sess.run([self.train_step], feed_dict={self.x: X_batch, self.y_: Y_batch})
-            accs.append(self.accuracy(Y_test, self.predict(X_test)))
-            print("\t Test accuracy: ", np.round(accs[-1], 6))
+            accs.append(self.accuracy(Y_test, self.predict_logits(X_test)))
+            print("\t Test accuracy: ", np.round(accs[-1], 6), " (", np.round(time.time()-time_0, 5), " s)")
             if 1+epoch >= early_stopping and np.argmax(accs[-early_stopping:])==0: break
         return np.array(accs)
 
-    def predict(self, X):
+    def predict_logits(self, X):
         n_test = X.shape[0]
         Y_batches = []
         for i in range(0,n_test,self.pred_mbs):
             X_batch = X[i:min(n_test,i+self.pred_mbs)]
-            Y_batches.append( self.sess.run(self.probs, feed_dict={self.x: X_batch}) )
+            Y_batches.append( self.sess.run(self.logits, feed_dict={self.x: X_batch}) )
         return np.concatenate(tuple(Y_batches), axis=0)
 
     def accuracy(self, Y_true, Y_pred):
