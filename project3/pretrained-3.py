@@ -25,10 +25,10 @@ X_test -= mean
 """
 
 print("Training . . . ")
-model = models.scratch.vgg16(lr=1e-3, mbs=50, pred_mbs=50, include_resize_and_center=True)
-accs = model.train(X_train, Y_train, eval_set=(X_test, Y_test), epochs=100, early_stopping=5)
+model = models.pretrained.vgg16(lr=1e-3, mbs=50, pred_mbs=50, include_resize_and_center=True, retrain_last_n_layers=3)
+accs = model.train(X_train, Y_train, eval_set=(X_test, Y_test), epochs=25, early_stopping=5)
 
 print("Saving results . . . ")
-np.save("results/scratch-1.npy", accs)
+np.save("results/pretrained-3.npy", accs)
 
 print("Done!")

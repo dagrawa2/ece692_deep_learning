@@ -26,7 +26,7 @@ X_test -= mean
 
 print("Training . . . ")
 model = models.pretrained.vgg16(lr=1e-3, mbs=50, pred_mbs=50, include_resize_and_center=True, retrain_last_n_layers=1)
-accs = model.train(X_train, Y_train, eval_set=(X_test, Y_test), epochs=100, early_stopping=5)
+accs = model.train(X_train, Y_train, eval_set=(X_test, Y_test), epochs=25, early_stopping=5)
 
 print("Saving results . . . ")
 np.save("results/pretrained-1.npy", accs)
