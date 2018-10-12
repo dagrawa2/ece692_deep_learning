@@ -16,21 +16,24 @@ Y_test = Y_test[:n]
 """
 
 """
-print("Resizing . . . ")
-X_train = models.preprocess.resize(X_train)
-X_test = models.preprocess.resize(X_test)
-
-#print("Centering . . . ")
-mean = 1.711960792541503906
-X_train -= mean
-X_test -= mean
+print("Centering . . . ")
+mean = np.array([[1.253069180468749977e+02, 1.229503941406249936e+02, 1.138653831835937495e+02]])
+X_train = X_train - mean
+X_test = X_test - mean
 """
 
+m = X_train.min()
+s = X_train.max()
+X_train -= m
+X_train = X_train/s
+X_test -= m
+X_test = X_test/s
+
 print("Training . . . ")
-model = models.scratch.vgg16(lr=1e-3, mbs=50, pred_mbs=50, include_resize_and_center=True)
+model = models.scratch1.vgg16(lr=1e-4, lr_decay=0.7, mbs=100, pred_mbs=2000)
 accs = model.train(X_train, Y_train, eval_set=(X_test, Y_test), epochs=100, early_stopping=5)
 
 print("Saving results . . . ")
-np.save("results/scratch.npy", accs)
+np.save("results/scratch-1c.npy", accs)
 
 print("Done!")
