@@ -12,7 +12,7 @@ class autoencoder:
 		self.mbs = mbs
 		self.pred_mbs = pred_mbs
 		self.x = tf.placeholder(tf.float32, shape=[None, 32, 32, 3])
-		self.build_decoder_layers()
+		self.build_autoencoder()
 
 	def build_encoder(self):
 		self.out_shapes = []
@@ -21,26 +21,28 @@ class autoencoder:
 		out = tf.identity(self.x)
 		for layer in self.encoder_layers:
 			self.out_shapes.append(tf.shape(out))
+			out = layer(out)
 			self.params = self.params + layer.get_params()
 			self.param_names = self.param_names + layer.get_param_names()
-			out = layer(out)
-		self.encoded = out
+		self.encoded = tf.identity(out)
 
 	def build_decoder_layers(self):
 		first_param_layer = -1
-		for layer in self_encoder_layers:
+		for layer in self.encoder_layers:
 			first_param_layer += 1
 			if len(layer.get_param_names()) > 0:
 				break
 		self.decoder_layers = []
-		for i, layer, output_shape in enumerate(list(zip(self.encoder_layers, self.out_shapes))[::-1]):
+		for i, (layer, output_shape) in enumerate(list(zip(self.encoder_layers, self.out_shapes))[::-1]):
 			activation = tf.nn.sigmoid if i == first_param_layer else tf.nn.relu
 			self.decoder_layers.append( layer.decoder(output_shape, activation) )
 
 	def build_decoder(self):
 		out = tf.identity(self.encoded)
 		for layer in self.decoder_layers:
-			out = layer(out) if layer is not None
+			if layer is not None:
+				out = layer(out)
+		self.reconstruction = tf.identity(out)
 
 	def build_block_autoencoder(self, block):
 		self.block_input = tf.placeholder(tf.float32, shape=self.out_shapes[block[0]])
@@ -48,24 +50,25 @@ class autoencoder:
 		for layer in [self.encoder_layers[i] for i in block]:
 			out = layer(out)
 		self.block_encoded = tf.identity(out)
-	for layer in [self.decoder_layers[-1-i] for i in block]:
-		out = layer(out)
+		for layer in [self.decoder_layers[-1-i] for i in block]:
+			out = layer(out)
 		loss = tf.nn.l2_loss(self.block_input-out)
 		self.pretrain_step = tf.train.AdamOptimizer(self.lr).minimize(loss)
 
 	def build_autoencoder(self):
 		self.build_encoder()
+		self.build_decoder_layers()
 		self.build_decoder()
 		self.loss = tf.nn.l2_loss(self.x - self.reconstruction)
-		self.train_step = tf.train.AdamOptimizer(self.lr).minimize(loss)
+		self.train_step = tf.train.AdamOptimizer(self.lr).minimize(self.loss)
 
-	def open_session(self):
+	def start_session(self):
 		self.sess = tf.Session()
 		init = tf.global_variables_initializer()
 		self.sess.run(init)
 
-	def close_session(self):
-		sess.close()
+	def cstop_session(self):
+		self.sess.close()
 
 	def pretrain(self, X_train, epochs=1):
 		n_train = X_train.shape[0]
@@ -86,7 +89,7 @@ class autoencoder:
 #						time_1 = time.time()
 					X_batch = X[i:min(n_train,i+self.mbs)]
 					self.sess.run([self.pretrain_step], feed_dict={self.block_input: X_batch})
-			X = self.block_encode(X):
+			X = self.block_encode(X)
 		return
 
 	def block_encode(self, X):
@@ -99,7 +102,6 @@ class autoencoder:
 
 
 	def train(self, X_train, X_test, epochs=1, early_stopping=None):
-		self.build_autoencoder()
 		if self.pred_mbs is None: self.pred_mbs = X_test.shape[0]
 		n_train = X_train.shape[0]
 		n_batches = int(np.ceil(n_train/self.mbs))
@@ -125,7 +127,7 @@ class autoencoder:
 			print("\t Test loss: ", np.round(losses[-1], 6), " (", np.round(time.time()-time_0, 5), " s)")
 			if 1+epoch >= 2 and losses[-1] < losses[-2]:
 				best_parameters = self.sess.run(self.params)
-			if 1+epoch >= early_stopping and np.argmin(lossess[-early_stopping:])==0: break
+			if 1+epoch >= early_stopping and np.argmin(losses[-early_stopping:])==0: break
 		sess.close()
 		best_parameters = {name: value for name, value in zip(self.param_names, best_parameters)}
 		return np.array(losses), best_parameters

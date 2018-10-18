@@ -43,7 +43,7 @@ class Convolution2D(Layer):
 
 	def build(self, input_tensor):
 		# build kernel
-		if self.kernel:
+		if self.kernel is not None:
 			assert self.kernel.get_shape() == self.kernel_shape
 		else:
 			self.kernel = tf.Variable(tf.truncated_normal(self.kernel_shape, stddev=0.1), name='kernel')
@@ -71,7 +71,7 @@ class Convolution2D(Layer):
 			return self.build(input_tensor)
 
 	def decoder(self, output_shape, activation):
-		return DeConvolution2D(self.kernel_shape, self.kernel, output_shape=output_shape, activation=activation, scope=self.scope+"_decoder")
+		return DeConvolution2D(self.kernel_shape, output_shape, kernel=self.kernel, activation=activation, scope=self.scope+"_decoder")
 
 	def get_params(self):
 		return [self.kernel, self.bias]
@@ -309,11 +309,15 @@ class FullyConnected(Layer):
 		num_batch, input_dim = input_tensor.get_shape()
 
 		# build weights
-		if self.weights:
+		if self.weights is not None:
+			print(self.weights.get_shape())
+			print(input_dim.value)
+			print(self.output_dim)
 			assert self.weights.get_shape() == (input_dim.value, self.output_dim)
 		else:
 			self.weights = tf.Variable(tf.truncated_normal((input_dim.value, self.output_dim), stddev=0.1),
 									   name='weights')
+			print("encode: ", self.weights.get_shape())
 
 		# build bias
 		if self.bias:
@@ -337,7 +341,8 @@ class FullyConnected(Layer):
 			return self.build(input_tensor)
 
 	def decoder(self, output_shape, activation):
-		return FullyConnected(output_shape[1:], weights=tf.transpose(self.weights), activation=activation, scope=self.scope+"_decoder")
+		output_dim, input_dim = self.weights.get_shape()
+		return FullyConnected(output_dim, weights=tf.transpose(self.weights), activation=activation, scope=self.scope+"_decoder")
 
 	def get_params(self):
 		return [self.weights, self.bias]
@@ -360,7 +365,7 @@ class Corrupt(Layer):
 
 	def build(self, input_tensor):
 		noise = tf.random_normal(shape=tf.shape(input_tensor), mean=0.0, stddev=self.noise_stdev, dtype=tf.float32)
-		corrupt = tf.minimum(tf.maximum(input_tensor+noise, 0.0)), 1.0)
+		corrupt = tf.minimum(tf.maximum(input_tensor+noise, 0.0), 1.0)
 		return corrupt
 
 	def call(self, input_tensor):
