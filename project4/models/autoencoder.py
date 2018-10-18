@@ -4,13 +4,14 @@ import numpy as np
 
 class autoencoder:
 
-	def __init__(self, encoder_layers, blocks, lr=0.01, lr_decay=1, mbs=1, pred_mbs=None):
+	def __init__(self, encoder_layers, blocks, lr=0.01, lr_decay=1, mbs=1, pred_mbs=None, seed=None):
 		self.encoder_layers = encoder_layers
 		self.blocks = blocks
 		self.lr = lr
 		self.lr_decay = lr_decay
 		self.mbs = mbs
 		self.pred_mbs = pred_mbs
+		if seed is not None: tf.set_random_seed(seed)
 		self.x = tf.placeholder(tf.float32, shape=[None, 32, 32, 3])
 		self.build_autoencoder()
 
@@ -67,7 +68,7 @@ class autoencoder:
 		init = tf.global_variables_initializer()
 		self.sess.run(init)
 
-	def cstop_session(self):
+	def stop_session(self):
 		self.sess.close()
 
 	def pretrain(self, X_train, epochs=1):
@@ -128,7 +129,6 @@ class autoencoder:
 			if 1+epoch >= 2 and losses[-1] < losses[-2]:
 				best_parameters = self.sess.run(self.params)
 			if 1+epoch >= early_stopping and np.argmin(losses[-early_stopping:])==0: break
-		sess.close()
 		best_parameters = {name: value for name, value in zip(self.param_names, best_parameters)}
 		return np.array(losses), best_parameters
 

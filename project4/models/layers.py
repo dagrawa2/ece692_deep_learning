@@ -310,14 +310,10 @@ class FullyConnected(Layer):
 
 		# build weights
 		if self.weights is not None:
-			print(self.weights.get_shape())
-			print(input_dim.value)
-			print(self.output_dim)
 			assert self.weights.get_shape() == (input_dim.value, self.output_dim)
 		else:
 			self.weights = tf.Variable(tf.truncated_normal((input_dim.value, self.output_dim), stddev=0.1),
 									   name='weights')
-			print("encode: ", self.weights.get_shape())
 
 		# build bias
 		if self.bias:
