@@ -34,9 +34,10 @@ class autoencoder:
 			if len(layer.get_param_names()) > 0:
 				break
 		self.decoder_layers = []
-		for i, (layer, output_shape) in enumerate(list(zip(self.encoder_layers, self.out_shapes))[::-1]):
+		for i, (layer, output_shape) in enumerate(list(zip(self.encoder_layers, self.out_shapes))):
 			activation = tf.nn.sigmoid if i == first_param_layer else tf.nn.relu
 			self.decoder_layers.append( layer.decoder(output_shape, activation) )
+		self.decoder_layers.reverse()
 
 	def build_decoder(self):
 		out = tf.identity(self.encoded)
@@ -139,3 +140,11 @@ class autoencoder:
 			X_batch = X[i:min(n_test,i+self.pred_mbs)]
 			batch_losses.append( self.sess.run(self.loss, feed_dict={self.x: X_batch}) )
 		return np.sum(batch_losses)/n_test
+
+	def denoise(self, X):
+		n_test = X.shape[0]
+		Y_batches = []
+		for i in range(0,n_test,self.pred_mbs):
+			X_batch = X[i:min(n_test,i+self.pred_mbs)]
+			Y_batches.append( self.sess.run(self.reconstruction, feed_dict={self.x: X_batch}) )
+		return np.concatenate(tuple(Y_batches), axis=0)

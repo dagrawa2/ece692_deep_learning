@@ -171,7 +171,6 @@ class vgg7:
         for i in range(0,n_test,self.pred_mbs):
             X_batch = X[i:min(n_test,i+self.pred_mbs)]
             Y_batches.append( self.sess.run(self.logits, feed_dict={self.x: X_batch}) )
-
         self.is_training = True
         return np.concatenate(tuple(Y_batches), axis=0)
 

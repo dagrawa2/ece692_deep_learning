@@ -57,10 +57,14 @@ model = models.autoencoder(layers, blocks, lr=1e-2, lr_decay=0.1, mbs=50, pred_m
 model.start_session()
 print("Training . . . ")
 losses, params = model.train(X_train, X_test, epochs=100, early_stopping=5)
+X_train = model.denoise(X_train)
+X_test = model.denoise(X_test)
 model.stop_session()
 
 print("Saving results . . . ")
 np.save("results/vgg16_ae_losses.npy", losses)
 np.savez("results/vgg16_ae_params.npz", **params)
+np.savez("results/vgg16_ae_X_train.npy", X_train)
+np.savez("results/vgg16_ae_X_test.npy", X_test)
 
 print("Done!")
