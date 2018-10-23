@@ -29,28 +29,33 @@ layers = [Corrupt(noise_stdev=0.1),
 	Corrupt(noise_stdev=0.1),
 	Convolution2D([3, 3, 64, 128], activation=tf.nn.relu, scope='conv2_1'),
 	Convolution2D([3, 3, 128, 128], activation=tf.nn.relu, scope='conv2_2'),
-	Convolution2D([3, 3, 128, 128], activation=tf.nn.relu, scope='conv2_3'),
 	MaxPooling(kernel_shape=[1, 2, 2, 1], strides=[1, 2, 2, 1], padding='SAME', scope='pool2'),
+	Corrupt(noise_stdev=0.1),
+	Convolution2D([3, 3, 128, 256], activation=tf.nn.relu, scope='conv3_1'),
+	Convolution2D([3, 3, 256, 256], activation=tf.nn.relu, scope='conv3_2'),
+	Convolution2D([3, 3, 256, 256], activation=tf.nn.relu, scope='conv3_3'),
+	MaxPooling(kernel_shape=[1, 2, 2, 1], strides=[1, 2, 2, 1], padding='SAME', scope='pool3'),
+
+	Corrupt(noise_stdev=0.1),
+	Convolution2D([3, 3, 256, 512], activation=tf.nn.relu, scope='conv4_1'),
+	Convolution2D([3, 3, 512, 512], activation=tf.nn.relu, scope='conv4_2'),
+	Convolution2D([3, 3, 512, 512], activation=tf.nn.relu, scope='conv4_3'),
+	MaxPooling(kernel_shape=[1, 2, 2, 1], strides=[1, 2, 2, 1], padding='SAME', scope='pool4'),
 	Unfold(scope='unfold'),
 	Corrupt(),
-	FullyConnected(512, activation=tf.nn.relu, scope='fc1')
+	FullyConnected(4096, activation=tf.nn.relu, scope='fc1')
 ]
 
-blocks = [[0, 1, 2],
-	[4, 5, 6, 7],
-	[10, 11]
-]
+blocks = []
 
 model = models.autoencoder(layers, blocks, lr=1e-4, mbs=50, pred_mbs=50, seed=456)
 model.start_session()
-print("Pretraining . . . ")
-model.pretrain(X_train, epochs=5)
 print("Training . . . ")
 losses, params = model.train(X_train, X_test, epochs=2, early_stopping=5)
 model.stop_session()
 
 print("Saving results . . . ")
-np.save("results/losses.npy", losses)
-np.savez("results/params.npz", **params)
+np.save("results/vgg16_ae_losses.npy", losses)
+np.savez("results/vgg16_ae_params.npz", **params)
 
 print("Done!")
