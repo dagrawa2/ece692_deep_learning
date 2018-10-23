@@ -41,6 +41,11 @@ layers = [Corrupt(noise_stdev=0.1),
 	Convolution2D([3, 3, 512, 512], activation=tf.nn.relu, scope='conv4_2'),
 	Convolution2D([3, 3, 512, 512], activation=tf.nn.relu, scope='conv4_3'),
 	MaxPooling(kernel_shape=[1, 2, 2, 1], strides=[1, 2, 2, 1], padding='SAME', scope='pool4'),
+	Corrupt(noise_stdev=0.1),
+	Convolution2D([3, 3, 512, 512], activation=tf.nn.relu, scope='conv5_1'),
+	Convolution2D([3, 3, 512, 512], activation=tf.nn.relu, scope='conv5_2'),
+	Convolution2D([3, 3, 512, 512], activation=tf.nn.relu, scope='conv5_3'),
+	MaxPooling(kernel_shape=[1, 2, 2, 1], strides=[1, 2, 2, 1], padding='SAME', scope='pool5'),
 	Unfold(scope='unfold'),
 	Corrupt(),
 	FullyConnected(4096, activation=tf.nn.relu, scope='fc1')
@@ -48,10 +53,10 @@ layers = [Corrupt(noise_stdev=0.1),
 
 blocks = []
 
-model = models.autoencoder(layers, blocks, lr=1e-4, mbs=50, pred_mbs=50, seed=456)
+model = models.autoencoder(layers, blocks, lr=1e-2, lr_decay=0.1, mbs=50, pred_mbs=50, seed=456)
 model.start_session()
 print("Training . . . ")
-losses, params = model.train(X_train, X_test, epochs=2, early_stopping=5)
+losses, params = model.train(X_train, X_test, epochs=100, early_stopping=5)
 model.stop_session()
 
 print("Saving results . . . ")

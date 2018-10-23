@@ -4,12 +4,13 @@ import numpy as np
 
 class vgg16:
 
-    def __init__(self, lr=0.01, mbs=1, pred_mbs=None, retrain_last_n_layers=1):
+    def __init__(self, lr=0.01, mbs=1, pred_mbs=None, retrain_last_n_layers=1, seed=None):
         n_params_per_block = [4, 4, 6, 6, 6, 2, 2, 2]
         self.n_pretrained_params = sum(n_params_per_block[:-retrain_last_n_layers])
         self.lr = lr
         self.mbs = mbs
         self.pred_mbs = pred_mbs
+        if seed is not None: tf.set_random_seed(seed)
         self.build_graph()
 
     def convlayers(self):
@@ -236,7 +237,7 @@ class vgg16:
         self.fc_layers()
         self.logits = self.fc3l
         cross_entropy = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(labels=self.y_, logits=self.logits))
-        self.train_step = tf.train.AdamOptimizer(self.lr).minimize(cross_entropy, var_list=self.parameters[self.n_pretrained_params:])
+        self.train_step = tf.train.AdamOptimizer(self.lr).minimize(cross_entropy)
 
     def train(self, X_train, Y_train, eval_set=None, epochs=1, early_stopping=None):
         self.sess = tf.Session()
@@ -259,9 +260,9 @@ class vgg16:
             Y = Y_train[indices]
             time_1 = time.time()
             for k, i in enumerate(range(0,n_train,self.mbs)):
-                if k%mb_progress == 0:
-                    print(k, "/", n_batches, " batches (", np.round(time.time()-time_1, 5), " s)")
-                    time_1 = time.time()
+#                if k%mb_progress == 0:
+#                    print(k, "/", n_batches, " batches (", np.round(time.time()-time_1, 5), " s)")
+#                    time_1 = time.time()
                 X_batch, Y_batch = X[i:min(n_train,i+self.mbs)], Y[i:min(n_train,i+self.mbs)]
                 self.sess.run([self.train_step], feed_dict={self.x: X_batch, self.y_: Y_batch})
             accs.append(self.accuracy(Y_test, self.predict_logits(X_test)))

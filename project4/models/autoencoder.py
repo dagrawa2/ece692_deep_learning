@@ -116,7 +116,7 @@ class autoencoder:
 			time_0 = time.time()
 			np.random.shuffle(indices)
 			X = X_train[indices]
-			if (1+epoch)%10 == 0: self.lr *= self.lr_decay
+			if (1+epoch)%10 == 0 and epoch < 29: self.lr *= self.lr_decay
 			time_1 = time.time()
 			for k, i in enumerate(range(0,n_train,self.mbs)):
 #				if k%mb_progress == 0:

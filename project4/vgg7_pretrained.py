@@ -22,10 +22,10 @@ X_test -= m
 X_test = X_test/s
 
 print("Training . . . ")
-model = models.vgg16(lr=1e-4, mbs=50, pred_mbs=50, retrain_last_n_layers=2, seed=456)
+model = models.vgg7(lr=1e-4, mbs=50, pred_mbs=50, retrain_last_n_layers=1, seed=456)
 accs = model.train(X_train, Y_train, eval_set=(X_test, Y_test), epochs=100, early_stopping=5)
 
 print("Saving results . . . ")
-np.save("results/vgg16_pretrained_accs.npy", accs)
+np.save("results/vgg7_pretrained_accs.npy", accs)
 
 print("Done!")

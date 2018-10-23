@@ -38,10 +38,10 @@ layers = [Corrupt(noise_stdev=0.1),
 
 blocks = []
 
-model = models.autoencoder(layers, blocks, lr=1e-4, mbs=50, pred_mbs=50, seed=456)
+model = models.autoencoder(layers, blocks, lr=1e-2, lr_decay=0.1, mbs=50, pred_mbs=50, seed=456)
 model.start_session()
 print("Training . . . ")
-losses, params = model.train(X_train, X_test, epochs=2, early_stopping=5)
+losses, params = model.train(X_train, X_test, epochs=100, early_stopping=5)
 model.stop_session()
 
 print("Saving results . . . ")
