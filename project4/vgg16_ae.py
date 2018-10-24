@@ -7,13 +7,13 @@ np.random.seed(123)
 print("Loading data . . . ")
 (X_train, Y_train), (X_test, Y_test) = models.load_data_from_keras()
 
-#"""
+"""
 n = 1000
 X_train = X_train[:n]
 Y_train = Y_train[:n]
 X_test = X_test[:n]
 Y_test = Y_test[:n]
-#"""
+"""
 
 m = X_train.min()
 s = X_train.max()
@@ -57,6 +57,7 @@ model = models.autoencoder(layers, blocks, lr=1e-2, lr_decay=0.1, mbs=50, pred_m
 model.start_session()
 print("Training . . . ")
 losses, params = model.train(X_train, X_test, epochs=100, early_stopping=5)
+print("Denoising . . . ")
 X_train = model.denoise(X_train)
 X_test = model.denoise(X_test)
 model.stop_session()
@@ -64,7 +65,7 @@ model.stop_session()
 print("Saving results . . . ")
 np.save("results/vgg16_ae_losses.npy", losses)
 np.savez("results/vgg16_ae_params.npz", **params)
-np.savez("results/vgg16_ae_X_train.npy", X_train)
-np.savez("results/vgg16_ae_X_test.npy", X_test)
+np.save("results/vgg16_ae_X_train.npy", X_train)
+np.save("results/vgg16_ae_X_test.npy", X_test)
 
 print("Done!")

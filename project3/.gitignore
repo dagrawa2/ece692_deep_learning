@@ -1,3 +1,5 @@
 cifar10
 frossard
 models/__pycache__
+results
+*.txt

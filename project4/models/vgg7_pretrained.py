@@ -4,9 +4,7 @@ import numpy as np
 
 class vgg7:
 
-    def __init__(self, lr=0.01, mbs=1, pred_mbs=None, retrain_last_n_layers=1, seed=None):
-        n_params_per_block = [4, 4, 6, 6, 6, 2, 2, 2]
-        self.n_pretrained_params = sum(n_params_per_block[:-retrain_last_n_layers])
+    def __init__(self, lr=0.01, mbs=1, pred_mbs=None, seed=None):
         self.lr = lr
         self.mbs = mbs
         self.pred_mbs = pred_mbs
@@ -133,11 +131,15 @@ class vgg7:
         with tf.control_dependencies(tf.get_collection(tf.GraphKeys.UPDATE_OPS)):
             self.train_step = tf.train.AdamOptimizer(self.lr).minimize(cross_entropy)
 
-    def train(self, X_train, Y_train, eval_set=None, epochs=1, early_stopping=None):
+    def start_session(self):
         self.sess = tf.Session()
         init = tf.global_variables_initializer()
         self.sess.run(init)
-        self.load_weights()
+
+    def stop_session(self):
+        self.sess.close()
+
+    def train(self, X_train, Y_train, eval_set=None, epochs=1, early_stopping=None):
         X_test, Y_test = eval_set
         if self.pred_mbs is None: self.pred_mbs = X_test.shape[0]
         n_train = X_train.shape[0]
@@ -177,9 +179,9 @@ class vgg7:
     def accuracy(self, Y_true, Y_pred):
         return np.mean(np.argmax(Y_true, axis=1)==np.argmax(Y_pred, axis=1))
 
-    def load_weights(self):
-        weights = np.load("results/vgg7_ae_params.npz")
-        keys = sorted(weights.keys())[:self.n_pretrained_params]
+    def load_weights(self, filename):
+        weights = np.load(filename)
+        keys = sorted(weights.keys())
         for i, k in enumerate(keys):
 #            print i, k, np.shape(weights[k])
             self.sess.run(self.parameters[i].assign(weights[k]))
