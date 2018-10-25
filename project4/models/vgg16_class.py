@@ -4,12 +4,11 @@ import numpy as np
 
 class vgg16:
 
-    def __init__(self, lr=0.01, mbs=1, pred_mbs=None, retrain_last_n_layers=1, seed=None):
-        n_params_per_block = [4, 4, 6, 6, 6, 2, 2, 2]
-        self.n_pretrained_params = sum(n_params_per_block[:-retrain_last_n_layers])
+    def __init__(self, lr=0.01, mbs=1, pred_mbs=None, seed=None):
         self.lr = lr
         self.mbs = mbs
         self.pred_mbs = pred_mbs
+        self.is_training = True
         if seed is not None: tf.set_random_seed(seed)
         self.build_graph()
 
@@ -24,7 +23,9 @@ class vgg16:
             biases = tf.Variable(tf.constant(0.0, shape=[64], dtype=tf.float32),
                                  trainable=True, name='biases')
             out = tf.nn.bias_add(conv, biases)
-            self.conv1_1 = tf.nn.relu(out, name=scope)
+            out_bn = tf.layers.batch_normalization(out, training=self.is_training)
+            out_drop = tf.layers.dropout(out_bn, training=self.is_training)
+            self.conv1_1 = tf.nn.relu(out_drop, name=scope)
             self.parameters += [kernel, biases]
 
         # conv1_2
@@ -35,7 +36,8 @@ class vgg16:
             biases = tf.Variable(tf.constant(0.0, shape=[64], dtype=tf.float32),
                                  trainable=True, name='biases')
             out = tf.nn.bias_add(conv, biases)
-            self.conv1_2 = tf.nn.relu(out, name=scope)
+            out_bn = tf.layers.batch_normalization(out, training=self.is_training)
+            self.conv1_2 = tf.nn.relu(out_bn, name=scope)
             self.parameters += [kernel, biases]
 
         # pool1
@@ -53,7 +55,9 @@ class vgg16:
             biases = tf.Variable(tf.constant(0.0, shape=[128], dtype=tf.float32),
                                  trainable=True, name='biases')
             out = tf.nn.bias_add(conv, biases)
-            self.conv2_1 = tf.nn.relu(out, name=scope)
+            out_bn = tf.layers.batch_normalization(out, training=self.is_training)
+            out_drop = tf.layers.dropout(out_bn, training=self.is_training)
+            self.conv2_1 = tf.nn.relu(out_drop, name=scope)
             self.parameters += [kernel, biases]
 
         # conv2_2
@@ -64,7 +68,8 @@ class vgg16:
             biases = tf.Variable(tf.constant(0.0, shape=[128], dtype=tf.float32),
                                  trainable=True, name='biases')
             out = tf.nn.bias_add(conv, biases)
-            self.conv2_2 = tf.nn.relu(out, name=scope)
+            out_bn = tf.layers.batch_normalization(out, training=self.is_training)
+            self.conv2_2 = tf.nn.relu(out_bn, name=scope)
             self.parameters += [kernel, biases]
 
         # pool2
@@ -82,7 +87,9 @@ class vgg16:
             biases = tf.Variable(tf.constant(0.0, shape=[256], dtype=tf.float32),
                                  trainable=True, name='biases')
             out = tf.nn.bias_add(conv, biases)
-            self.conv3_1 = tf.nn.relu(out, name=scope)
+            out_bn = tf.layers.batch_normalization(out, training=self.is_training)
+            out_drop = tf.layers.dropout(out_bn, training=self.is_training)
+            self.conv3_1 = tf.nn.relu(out_drop, name=scope)
             self.parameters += [kernel, biases]
 
         # conv3_2
@@ -93,7 +100,9 @@ class vgg16:
             biases = tf.Variable(tf.constant(0.0, shape=[256], dtype=tf.float32),
                                  trainable=True, name='biases')
             out = tf.nn.bias_add(conv, biases)
-            self.conv3_2 = tf.nn.relu(out, name=scope)
+            out_bn = tf.layers.batch_normalization(out, training=self.is_training)
+            out_drop = tf.layers.dropout(out_bn, training=self.is_training)
+            self.conv3_2 = tf.nn.relu(out_drop, name=scope)
             self.parameters += [kernel, biases]
 
         # conv3_3
@@ -104,7 +113,8 @@ class vgg16:
             biases = tf.Variable(tf.constant(0.0, shape=[256], dtype=tf.float32),
                                  trainable=True, name='biases')
             out = tf.nn.bias_add(conv, biases)
-            self.conv3_3 = tf.nn.relu(out, name=scope)
+            out_bn = tf.layers.batch_normalization(out, training=self.is_training)
+            self.conv3_3 = tf.nn.relu(out_bn, name=scope)
             self.parameters += [kernel, biases]
 
         # pool3
@@ -122,7 +132,9 @@ class vgg16:
             biases = tf.Variable(tf.constant(0.0, shape=[512], dtype=tf.float32),
                                  trainable=True, name='biases')
             out = tf.nn.bias_add(conv, biases)
-            self.conv4_1 = tf.nn.relu(out, name=scope)
+            out_bn = tf.layers.batch_normalization(out, training=self.is_training)
+            out_drop = tf.layers.dropout(out_bn, training=self.is_training)
+            self.conv4_1 = tf.nn.relu(out_drop, name=scope)
             self.parameters += [kernel, biases]
 
         # conv4_2
@@ -133,7 +145,9 @@ class vgg16:
             biases = tf.Variable(tf.constant(0.0, shape=[512], dtype=tf.float32),
                                  trainable=True, name='biases')
             out = tf.nn.bias_add(conv, biases)
-            self.conv4_2 = tf.nn.relu(out, name=scope)
+            out_bn = tf.layers.batch_normalization(out, training=self.is_training)
+            out_drop = tf.layers.dropout(out_bn, training=self.is_training)
+            self.conv4_2 = tf.nn.relu(out_drop, name=scope)
             self.parameters += [kernel, biases]
 
         # conv4_3
@@ -144,7 +158,8 @@ class vgg16:
             biases = tf.Variable(tf.constant(0.0, shape=[512], dtype=tf.float32),
                                  trainable=True, name='biases')
             out = tf.nn.bias_add(conv, biases)
-            self.conv4_3 = tf.nn.relu(out, name=scope)
+            out_bn = tf.layers.batch_normalization(out, training=self.is_training)
+            self.conv4_3 = tf.nn.relu(out_bn, name=scope)
             self.parameters += [kernel, biases]
 
         # pool4
@@ -162,7 +177,9 @@ class vgg16:
             biases = tf.Variable(tf.constant(0.0, shape=[512], dtype=tf.float32),
                                  trainable=True, name='biases')
             out = tf.nn.bias_add(conv, biases)
-            self.conv5_1 = tf.nn.relu(out, name=scope)
+            out_bn = tf.layers.batch_normalization(out, training=self.is_training)
+            out_drop = tf.layers.dropout(out_bn, training=self.is_training)
+            self.conv5_1 = tf.nn.relu(out_drop, name=scope)
             self.parameters += [kernel, biases]
 
         # conv5_2
@@ -173,7 +190,9 @@ class vgg16:
             biases = tf.Variable(tf.constant(0.0, shape=[512], dtype=tf.float32),
                                  trainable=True, name='biases')
             out = tf.nn.bias_add(conv, biases)
-            self.conv5_2 = tf.nn.relu(out, name=scope)
+            out_bn = tf.layers.batch_normalization(out, training=self.is_training)
+            out_drop = tf.layers.dropout(out_bn, training=self.is_training)
+            self.conv5_2 = tf.nn.relu(out_drop, name=scope)
             self.parameters += [kernel, biases]
 
         # conv5_3
@@ -184,7 +203,8 @@ class vgg16:
             biases = tf.Variable(tf.constant(0.0, shape=[512], dtype=tf.float32),
                                  trainable=True, name='biases')
             out = tf.nn.bias_add(conv, biases)
-            self.conv5_3 = tf.nn.relu(out, name=scope)
+            out_bn = tf.layers.batch_normalization(out, training=self.is_training)
+            self.conv5_3 = tf.nn.relu(out_bn, name=scope)
             self.parameters += [kernel, biases]
 
         # pool5
@@ -204,7 +224,8 @@ class vgg16:
             fc1b = tf.Variable(tf.constant(1.0, shape=[4096], dtype=tf.float32),
                                  trainable=True, name='biases')
             pool5_flat = tf.reshape(self.pool5, [-1, shape])
-            fc1l = tf.nn.bias_add(tf.matmul(pool5_flat, fc1w), fc1b)
+            pool5_flat_drop = tf.layers.dropout(pool5_flat, training=self.is_training)
+            fc1l = tf.nn.bias_add(tf.matmul(pool5_flat_drop, fc1w), fc1b)
             self.fc1 = tf.nn.relu(fc1l)
             self.parameters += [fc1w, fc1b]
 
@@ -215,7 +236,9 @@ class vgg16:
                                                          stddev=1e-1), name='weights')
             fc2b = tf.Variable(tf.constant(1.0, shape=[4096], dtype=tf.float32),
                                  trainable=True, name='biases')
-            fc2l = tf.nn.bias_add(tf.matmul(self.fc1, fc2w), fc2b)
+            fc1_bn = tf.layers.batch_normalization(self.fc1, training=self.is_training)
+            fc1_drop = tf.layers.dropout(fc1_bn, training=self.is_training)
+            fc2l = tf.nn.bias_add(tf.matmul(fc1_drop, fc2w), fc2b)
             self.fc2 = tf.nn.relu(fc2l)
             self.parameters += [fc2w, fc2b]
 
@@ -226,7 +249,9 @@ class vgg16:
                                                          stddev=1e-1), name='weights')
             fc3b = tf.Variable(tf.constant(1.0, shape=[10], dtype=tf.float32),
                                  trainable=True, name='biases')
-            self.fc3l = tf.nn.bias_add(tf.matmul(self.fc2, fc3w), fc3b)
+            fc2_bn = tf.layers.batch_normalization(self.fc2, training=self.is_training)
+            fc2_drop = tf.layers.dropout(fc2_bn, training=self.is_training)
+            self.fc3l = tf.nn.bias_add(tf.matmul(fc2_drop, fc3w), fc3b)
             self.parameters += [fc3w, fc3b]
 
     def build_graph(self):
@@ -237,13 +262,18 @@ class vgg16:
         self.fc_layers()
         self.logits = self.fc3l
         cross_entropy = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(labels=self.y_, logits=self.logits))
-        self.train_step = tf.train.AdamOptimizer(self.lr).minimize(cross_entropy)
+        with tf.control_dependencies(tf.get_collection(tf.GraphKeys.UPDATE_OPS)):
+            self.train_step = tf.train.AdamOptimizer(self.lr).minimize(cross_entropy)
 
-    def train(self, X_train, Y_train, eval_set=None, epochs=1, early_stopping=None):
+    def start_session(self):
         self.sess = tf.Session()
         init = tf.global_variables_initializer()
         self.sess.run(init)
-        self.load_weights()
+
+    def stop_session(self):
+        self.sess.close()
+
+    def train(self, X_train, Y_train, eval_set=None, epochs=1, early_stopping=None):
         X_test, Y_test = eval_set
         if self.pred_mbs is None: self.pred_mbs = X_test.shape[0]
         n_train = X_train.shape[0]
@@ -271,19 +301,21 @@ class vgg16:
         return np.array(accs)
 
     def predict_logits(self, X):
+        self.is_training = False
         n_test = X.shape[0]
         Y_batches = []
         for i in range(0,n_test,self.pred_mbs):
             X_batch = X[i:min(n_test,i+self.pred_mbs)]
             Y_batches.append( self.sess.run(self.logits, feed_dict={self.x: X_batch}) )
+        self.is_training = True
         return np.concatenate(tuple(Y_batches), axis=0)
 
     def accuracy(self, Y_true, Y_pred):
         return np.mean(np.argmax(Y_true, axis=1)==np.argmax(Y_pred, axis=1))
 
-    def load_weights(self):
-        weights = np.load("results/vgg16_ae_params.npz")
-        keys = sorted(weights.keys())[:self.n_pretrained_params]
+    def load_weights(self, filename):
+        weights = np.load(filename)
+        keys = sorted(weights.keys())
         for i, k in enumerate(keys):
 #            print i, k, np.shape(weights[k])
             self.sess.run(self.parameters[i].assign(weights[k]))
