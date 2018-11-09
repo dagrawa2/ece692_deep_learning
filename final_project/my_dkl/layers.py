@@ -36,7 +36,7 @@ class Convolution2D(Layer):
 		self.activation = activation
 		self._name = name
 		self.kernel = Parameter(utils.truncated_normal(scale=0.1, size=self.kernel_shape, dtype=settings.float_type), name='kernel')
-		self.bias = Parameter(tf.constant(0.1, shape=[kernel_shape[-1]], dtype=settings.float_type), name='bias')
+		self.bias = Parameter(0.1*np.ones((kernel_shape[-1]), dtype=settings.float_type), name='bias')
 
 	@name_scope_for_layer
 	@params_as_tensors
@@ -52,7 +52,7 @@ class Convolution2D(Layer):
 
 class MaxPooling(Layer):
 
-	def __init__(self, kernel_shape=[1,2,2,1], strides=[1,2,2,1], padding="same", name=''):
+	def __init__(self, kernel_shape=[1,2,2,1], strides=[1,2,2,1], padding="SAME", name=''):
 		Layer.__init__(self)
 		self.kernel_shape = kernel_shape
 		self.strides = strides

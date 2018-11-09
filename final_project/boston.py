@@ -17,6 +17,10 @@ y = y.reshape((-1, 1))
 # (we should ideally do this separately on training and test sets . . . but whatever)
 X = (X-np.mean(X, axis=0, keepdims=True))/np.std(X, axis=0, keepdims=True)
 
+# set to gpflow data type
+X = X.astype(gpflow.settings.float_type)
+y = y.astype(gpflow.settings.float_type)
+
 # split into training and test sets
 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=456)
 

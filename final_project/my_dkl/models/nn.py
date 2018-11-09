@@ -65,6 +65,7 @@ class NN(GPModel):
 		if eval_set is not None:
 			self.scores = []
 			X_test, Y_test = eval_set
+			if len(X_test.shape) >= 3: X_test = X_test.reshape((-1, np.prod(np.array(list(X_test.shape)[1:]))))
 			opt.minimize(self, maxiter=self._iters_per_epoch*epochs, step_callback=lambda step: self.evaluate(step, X_test, Y_test))
 			return np.array(self.scores)
 		else:
@@ -79,4 +80,4 @@ class NN(GPModel):
 			print("Epoch ", step//self._iters_per_epoch, ": Acc ", np.round(acc, 4))
 
 	def save_params(self, filename):
-		np.savez(filename, self.read_trainables())
+		np.savez(filename, **self.read_trainables())

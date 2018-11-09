@@ -9,21 +9,27 @@ from my_dkl.layers import *
 np.random.seed(123)
 tf.set_random_seed(345)
 
-(X_train, Y_train), (X_test, Y_test) = datasets.load_fashion(n_classes=2, p=0.1)
+print("Loading MNIST data . . . ")
+(X_train, Y_train), (X_test, Y_test) = datasets.load_mnist(n_classes=10, p=0.2, map_into_unit_range=True)
 
-input_dim = list(X_train.shape[1:])
-layers = [input(input_dim),	Convolution2D([5, 5, 1, 32], activation=tf.nn.relu, name="conv1"),
+print("Initializing NN layers . . . ")
+input_dim = list(X_train.shape)[1:]
+output_dim = Y_train.shape[1]
+layers = [Input(input_dim),
 	Convolution2D([5, 5, 1, 32], activation=tf.nn.relu, name="conv1"),
 	MaxPooling(name="pool1"),
 	Convolution2D([5, 5, 32, 64], activation=tf.nn.relu, name="conv2"),
 	MaxPooling(name="pool2"),
 	Unfold(name="unfold"),
 	FullyConnected([7*7*64, 1024], activation=tf.nn.relu, name="fc1"),
-	FullyConnected([1024, 2], name="fc2")
+	FullyConnected([1024, output_dim], name="fc2")
 ]
 
+print("Initializing NN model . . . ")
 model = models.NN(X_train, Y_train, layers, minibatch_size=50)
-accs = model.train(eval_set=(X_test, Y_test), lr=1e-3, epochs=50)
+accs = model.train(eval_set=(X_test, Y_test), lr=1e-3, epochs=2)
 
-np.save("results/fashion_2_accs.npy", accs)
-model.save_params("results/fashion_2_params.npz")
+print("Saving accuracies . . . ")
+np.save("results/mnist_1_accs.npy", accs)
+
+print("Done!")

@@ -64,7 +64,9 @@ class GPSGD(GPModel):
 	def train(self, lr=1e-3, eval_set=None, epochs=1):
 		opt = gpflow.train.AdamOptimizer(learning_rate=lr)
 		if eval_set is not None:
+			self.scores = []
 			X_test, Y_test = eval_set
+			if len(X_test.shape) >= 3: X_test = X_test.reshape((-1, np.prod(np.array(list(X_test.shape)[1:]))))
 			opt.minimize(self, maxiter=self._iters_per_epoch*epochs, step_callback=lambda step: self.evaluate(step, X_test, Y_test))
 		else:
 			opt.minimize(self, maxiter=self._iters_per_epoch*epochs)
@@ -72,13 +74,14 @@ class GPSGD(GPModel):
 	def evaluate(self, step, X, Y):
 		if (step+1)%self._iters_per_epoch == 0:
 			pred_mean, pred_var = self.predict_y(X)
-			mse = np.sum((pred_mean-Y.reshape(pred_mean.shape))**2)/Y.shape[0]
-			print("Epoch ", step//self._iters_per_epoch, ": MSE ", np.round(mse, 4))
+#			mse = np.sum((pred_mean-Y.reshape(pred_mean.shape))**2)/Y.shape[0]
+			acc = np.mean(np.equal(np.argmax(Y, axis=1), np.argmax(pred_mean, axis=1)))
+			print("Epoch ", step//self._iters_per_epoch, ": Acc ", np.round(acc, 4))
 
 	def load_params_NN(self, filename):
-		params = np.loadz(filename)
+		params = np.load(filename)
 		params = {name: params["NN"+name[10:]] for name in self.read_trainables().keys() if name[11:16] == "layer"}
 		self.assign(params)
 
 	def save_params(self, filename):
-		np.savez(filename, self.read_trainables())
+		np.savez(filename, **self.read_trainables())
