@@ -107,7 +107,7 @@ class character_rnn(object):
 		'''
 		
 		#convert characters to indices
-		print "converting text in indices"
+		print("converting text in indices")
 		text_indices = [self.char2idx[char] for char in text if char in self.char2idx]
 		
 		#get length of text
@@ -132,7 +132,7 @@ class character_rnn(object):
 				feed_dict = {self.input:[sequence]}
 				pred = self.sess.run(self.predictions,feed_dict=feed_dict)
 				sample = ''.join([self.idx2char[idx[0]] for idx in pred])
-				print "iteration %i generated sample: %s" % (i+1,sample)
+				print("iteration %i generated sample: %s" % (i+1,sample))
 		
 		
 if __name__ == "__main__":
