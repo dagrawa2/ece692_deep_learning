@@ -8,8 +8,11 @@ import string
 import re
 import collections
 import logging
-from matplotlib import pyplot as plt
 from sklearn.manifold import TSNE
+
+import matplotlib
+matplotlib.use("agg")
+import matplotlib.pyplot as plt
 
 #logging setup
 logging.basicConfig(format='%(asctime)s : %(levelname)s : %(message)s', level=logging.INFO)
