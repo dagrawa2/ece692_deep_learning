@@ -57,6 +57,7 @@ class NN(GPModel):
 
 	@not_use_minibatches
 	def predict_y(self, Xnew):
+		if len(Xnew.shape) >= 3: Xnew = Xnew.reshape((-1, np.prod(np.array(list(Xnew.shape)[1:]))))
 		return super(NN, self).predict_y(Xnew)
 
 	@use_minibatches

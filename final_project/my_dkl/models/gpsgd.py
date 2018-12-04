@@ -52,12 +52,20 @@ class GPSGD(GPModel):
 		y = self.Y - self.mean_function(self.X)
 		Kmn = self.kern.K(self.X, Xnew)
 		Kmm_sigma = self.kern.K(self.X) + tf.eye(tf.shape(self.X)[0], dtype=settings.float_type) * self.likelihood.variance
+		###
+#		Kmm_sigma = tf.Print(Kmm_sigma, [tf.shape(Kmm_sigma)], message="K.shape: ", summarize=10)
+#		Kmm_sigma = tf.Print(Kmm_sigma, [tf.sqrt(tf.reduce_mean((Kmm_sigma-tf.transpose(Kmm_sigma))**2))], message="K-K.T MSE: ", summarize=10)
+#		Kmm_sigma = tf.Print(Kmm_sigma, [tf.reduce_min(Kmm_sigma), tf.reduce_max(Kmm_sigma)], message="K min max: ", summarize=10)
+#		eig, _ = tf.linalg.eigh(Kmm_sigma)
+#		Kmm_sigma = tf.Print(Kmm_sigma, [tf.reduce_min(eig), tf.reduce_max(eig)], message="K min max eig: ", summarize=10)
+		###
 		Knn = self.kern.K(Xnew) if full_cov else self.kern.Kdiag(Xnew)
 		f_mean, f_var = base_conditional(Kmn, Kmm_sigma, Knn, y, full_cov=full_cov, white=False)  # N x P, N x P or P x N x N
 		return f_mean + self.mean_function(Xnew), f_var
 
 	@not_use_minibatches
 	def predict_y(self, Xnew):
+		if len(Xnew.shape) >= 3: Xnew = Xnew.reshape((-1, np.prod(np.array(list(Xnew.shape)[1:]))))
 		return super(GPSGD, self).predict_y(Xnew)
 
 	@use_minibatches
@@ -68,14 +76,17 @@ class GPSGD(GPModel):
 			X_test, Y_test = eval_set
 			if len(X_test.shape) >= 3: X_test = X_test.reshape((-1, np.prod(np.array(list(X_test.shape)[1:]))))
 			opt.minimize(self, maxiter=self._iters_per_epoch*epochs, step_callback=lambda step: self.evaluate(step, X_test, Y_test))
+			return np.array(self.scores)
 		else:
 			opt.minimize(self, maxiter=self._iters_per_epoch*epochs)
+			return None
 
 	def evaluate(self, step, X, Y):
 		if (step+1)%self._iters_per_epoch == 0:
 			pred_mean, pred_var = self.predict_y(X)
 #			mse = np.sum((pred_mean-Y.reshape(pred_mean.shape))**2)/Y.shape[0]
 			acc = np.mean(np.equal(np.argmax(Y, axis=1), np.argmax(pred_mean, axis=1)))
+			self.scores.append(acc)
 			print("Epoch ", step//self._iters_per_epoch, ": Acc ", np.round(acc, 4))
 
 	def load_params_NN(self, filename):
