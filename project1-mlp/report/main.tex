@@ -1,0 +1,64 @@
+\documentclass[11pt]{article}
+\usepackage[margin=0.9in]{geometry}
+\usepackage{amsmath, graphicx}
+
+\title{ECE 692 Project 1: Multi-Layer Perceptron on MNIST}
+\author{Devanshu Agrawal}
+\date{September 7, 2018}
+
+\begin{document}
+\maketitle
+
+I implemented multi-layer perceptrons (MLPs) in numpy and in tensorflow and applied them to the MNIST digits data set. I used Nielsen's code for the numpy implementation. Along with his code, Neilsen provides a copy of MNIST where the 60,000 training images are split into a training set of 50,000 images and a validation set of 10,000 images. I trained the numpy MLP on the training set of 50,000 images and then tested it on the validation set. I did not use the separate test set. For the tensorflow MLP, I took the copy of MNIST shipped with tensorflow and split the training set into a training set of 50,000 images and a validation set of 10,000 images. I trained the tensorflow MLP on the training set and tested it on the validation set. It is important to note that the training-validation splits of MNIST for the numpy and tensorflow MLP models are not necessarily the same.
+
+It is also important to mention that Nielsen's code is very slow. This is because his code does not take full advantage of the parallelism that numpy has to offer; e.g., Nielsen loops through each mini-batch instead of passing the entire mini-batch together into the network. This bottleneck in efficiency means that my hyperparameter optimization (HO) is by no means refined.
+
+I tested the following hyperparameter combinations: I first considered one hidden layer for four different widths (8, 32, 128, 512) and trained with three different learning rates (0.01, 0.05, 0.1). We set the maximum number of training epochs to 50. I also implemented early stopping: If after any iteration the validation accuracy decreases or improves by an amount less than $10^{-5}$, then training is stopped. I recorded the validation accuracy for each trial (see Figures \ref{tf-1} and \ref{np-1}. The tensorflow MLP does very poorly -- close to random chance -- for learning rate 0.01 but achieves good performance with higher learning rates. The tensorflow MLP achieves the highest accuracy (0.9537) for a width of 128 and learning rate 0.1.
+
+The numpy MLP accuracies follow the same general trend , but there are also important differences: First, the numpy MLP achieves decent accuracy with learning rate 0.01 and higher accuracies overall. But the highest validation accuracy (0.9586) is still attained at width 128 and learning rate 0.1. I believe the difference in the performances of the numpy and tensorflow implementations is because of different weight initialization schemes; the numpy model used Gaussian initialization while the tensorflow model used uniform initialization. My results suggest that Gaussian initialization leads to better performance.
+
+I also tested architectures with two hidden layers. Since my single-hidden-layer models attained best performance with 128 hidden neurons, then I fixed the first hidden layer to width 128. I tested three widths for the second hidden layer (32, 64, 128) and three learning rates (0.01, 0.05, 0.1). I implemented early stopping just as before (see Figures \ref{tf-2} and \ref{np-2}). The tensorflow MLP performed very poorly for all hyperparameter combinations-- almost no better than random chance. It appears as though the MLP was not able to train. In contrast, the numpy MLP performs poorly for learning rate 0.01 but very well for higher learning rates. The numpy MLP attains its highest validation accuracy (0.9675) at width 64 and learning rate 0.1. I believe the difference in the performances of the numpy and tensorflow models is again due to the difference in weight initialization schemes.
+
+In conclusion, I found that the best architecture has two hidden layers with 128 and 64 neurons respectively, and the optimal learning rate is 0.1.
+
+\newpage
+
+\newpage
+
+\textbf{Batch vs. online processing: } Batch learning is a form of learning where the entire training set is used to update the model at each iteration. Online learning, on the other hand, updates the model one training sample at a time. Although batch learning can result in a lower loss, online learning is sometimes the only option if all training data is not available at once-- e.g., if training data is streaming.
+
+\textbf{Gradient descent vs. stochastic gradient descent: } Gradient descent is an iterative optimization algorithm where the parameters of a model are updated against the gradient of a loss function; this loss function is typically the average of losses of all training samples. Stochastic gradient descent loops through the randomly shuffled training data, and updates the model parameters against the gradient of the loss of each individual training sample; the loss function is in this sense ``stochastic''. Stochastic gradient descent therefore generates noise, and this often helps to deter overfitting.
+
+\textbf{Perceptron vs. sigmoid neurons: } A perceptron is a model that consists of an affine map followed by a Heaviside step function. A sigmoid neuron is similar but replaces the Heaviside step function with the sigmoid function. The sigmoid neuron is therefore differentiable and has nonzero (although possibly very close to zero) gradient; this means that it is possible to apply gradient descent to a sigmoid neuron.
+
+\textbf{Feedforward vs. backpropagation: } Feedforward refers to the forward cascade of activations in a neural network from the input layer up through the output layer. Back propagation is an algorithm that implements the chain rule to update the parameters of a neural network; it effectively propagates errors backward through the network. The alternation of feedforward activations and backpropagation of errors comprises the training process for a neural network.
+
+\newpage
+
+\begin{figure}[h!]
+\centering
+\includegraphics[width=4in]{../plots/tf_1.png}
+\caption{\label{tf-1} Validation accuracies of the single-hidden-layer MLP implemented in tensorflow for various combinations of width (number of hidden neurons) and learning rate. Accuracy is very low for learning rate 0.01 but much better for higher learning rates. The best accuracy is 0.9357 at width 128 and learning rate 0.1. See text for further discussion.}
+\end{figure}
+
+\begin{figure}[h!]
+\centering
+\includegraphics[width=4in]{../plots/np_1.png}
+\caption{\label{np-1} Validation accuracies of the single-hidden-layer MLP implemented in numpy for various combinations of width (number of hidden neurons) and learning rate. All accuracies are higher than those shown in Figure \ref{tf-1} (note the difference in color scale in Figures \ref{tf-1} and \ref{np-1}). The best accuracy is 0.9386 at width 128 and learning rate 0.1. See text for further discussion.}
+\end{figure}
+
+\newpage
+
+\begin{figure}[h!]
+\centering
+\includegraphics[width=4in]{../plots/tf_2.png}
+\caption{\label{tf-2} Validation accuracies of the two-hidden-layer MLP implemented in tensorflow for various combinations of width (number of neurons in second hidden layer) and learning rate. All accuracies reflect performance no better than chance for all hyperparameter combinations. Note the difference in color scale between Figures \ref{tf-1} and \ref{tf-2}. See text for further discussion.}
+\end{figure}
+
+\begin{figure}[h!]
+\centering
+\includegraphics[width=4in]{../plots/np_2.png}
+\caption{\label{np-2} Validation accuracies of the two-hidden-layer MLP implemented in numpy for various combinations of width (number of neurons in second hidden layer) and learning rate. Accuracy is low for learning rate 0.01 but very good for higher learning rates, attaining the highest accuracy out of all models tested so far. See text for further discussion.}
+\end{figure}
+
+\end{document}

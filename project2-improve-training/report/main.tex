@@ -1,0 +1,118 @@
+\documentclass[11pt]{article}
+\usepackage[margin=0.9in]{geometry}
+\usepackage{amsmath, graphicx}
+
+\title{ECE 692 Project 2: How to better train a neural network}
+\author{Devanshu Agrawal}
+\date{September 28, 2018}
+
+\begin{document}
+\maketitle
+
+\section{Fully-connected neural network}
+
+I used my own implementation of an NN since I found Nielsen's implementation to be prohibitively slow. Neilsen himself acknowledges that his code is pedagogical and is not optimized for speed. In particular, Neilsen formats the data as a list of (image, label) tuples and loops through individual instances in each mini-batch; i.e., Neilsen's code does not take advantage of the parallelism that mini-batching offers.
+
+I implemented my NN using numpy and ensured that all computations for a given mini-batch are parallelized across all instances in the mini-batch. For all subtasks listed below, I trained my NN on the MNIST training set (60,000 images) and evaluated the accuracy of the model on the test set (10,000 images) after each epoch. I implemented early stopping so that if the test accuracy does not improve in any 10 epochs, then training is halted. The reported test accuracy is then the greatest accuracy that the NN attained on the test set during training.
+
+\subsection{Effect of the cost function}
+
+I implemented an NN with 0 hidden layers with the following cost function and output-layer activation combinations: quadratic cost and sigmoid output; cross-entropy cost and sigmoid output; and log-likelihood cost and softmax output. Test accuracies after each epoch during training for each of the three NNs are presented (Figure \ref{fig-1-1}).
+
+\begin{figure}
+\centering
+\includegraphics[width=4in]{../plots/1-1.png}
+\caption{\label{fig-1-1} Test accuracies after each epoch of training for zero-hidden-layer NNs trained with three different combinations of cost function and output activation. Number of epochs varies due to early stopping.}
+\end{figure}
+
+All three models converge to similar test accuracies (about 92-93\%), but the NN with sigmoid output and trained with quadratic cost takes significantly longer to converge. This can be understood through the ``learning slow-down problem''.
+
+I proceed to describe the learning slow-down problem. Consider one output neuron of an NN with sigmoid output activation. Let $L(t, y)$ be the cost given target value $t$ and prediction $y$. The first ``delta'' in back-propagation is the partial derivative of the cost with respect to the pre-activations $z$ of the output; this turns out to be
+\[ \Delta = \frac{\partial L(t, y)}{\partial z}\cdot y(1-y). \]
+We see that in the saturation limits $y\rightarrow 0$ or $y\rightarrow 1$, $\Delta$ vanishes. This effect is propagated back through the network during each iteration of training and results in very small gradients. Therefore, even though the NN trains, the rate of convergence is slow; indeed, this is what we observe with quadratic cost.
+
+Suppose now that we take cross-entropy as the cost. Then for each output neuron, we have
+\[ \frac{\partial L(t, y)}{\partial z} = \frac{t-y}{y(1-y)}, \]
+so that the first delta becomes
+\[ \Delta = \frac{t-y}{y(1-y)}\cdot y(1-y) = t-y. \]
+We see in this case that $\Delta$ vanishes only when $y=t$; i.e., cross-entropy cost helps to avoid the learning slow-down problem.
+
+We also observed that log-likelihood with softmax output attained the highest test accuracy (92.5\%). Log-likelihood with softmax is very similar to cross entropy and resolves the learning slow-down problem in a similar way. In fact, cross entropy is nothing but log-likelihood for binary problems. The advantage of softmax is that it returns a probability distribution over classes; in contrast, using multiple sigmoid output neurons falsely assumes that the classes are not mutually exclusive. This is why softmax improved performance.
+
+
+\subsection{Effect of regularization}
+
+I took the NN with cross-entropy cost and sigmoid output and trained it again first with $L_2$ regularization and then with $L_1$ regularization; I used a regularization coefficient of $0.1$ in both cases. In addition to these two models, I also trained an $L_1$-regularized NN on MNIST augmented with random affine transformations; for each training image, I generated three additional training images-- one random translation, one random rotation (within $\pm 20^\circ$), and one random dilation (between 90\% and 110\%). The augmented data set therefore contains 240,000 images. For comparison, I took the unregularized NN with cross-entropy cost from Task 1.1 as the baseline. The test accuracies for the baseline and the three regularized models are presented (Figure \ref{fig-1-2}).
+
+\begin{figure}
+\centering
+\includegraphics[width=4in]{../plots/1-2.png}
+\caption{\label{fig-1-2} Test accuracies after each epoch of training for four zero-hidden-layer NNs with cross-entropy cost and different regularization schemes. The baseline model is identical to the cross-entropy-cost NN from Task 1.1 (black).}
+\end{figure}
+
+We see that $L_1$ and $L_2$ regularization did not help to improve performance as compared to the baseline. I tried to increase the regularization coefficients but obtained worse performance. Perhaps stronger regularization is effective only when accompanied with a smaller learning rate; I did not try this.
+
+$L_1$ and $L_2$ regularization are methods to deter overfitting. It is important to understand that these regularization methods are not specific to neural networks but can be applied to other parametric models as well. I will explain $L_1$ and $L_2$ regularization in the context of Bayesian probability theory. Suppose we place Gaussian priors on the parameters of an NN. Given a cost function and data, we can use Bayes' Law to write down the posterior distribution. For deterministic models, we are interested only in the most probable model-- i.e., the mode of the posterior. Finding the posterior mode is equivalent to finding the minimum of the negative-log posterior; the resulting cost function turns out to be the original cost function plus an $L_2$ regularizer; thus, the $L_2$ regularizer is the negative-log of the Gaussian prior on the parameters. Now, increasing the regularization coefficient corresponds to a tighter prior (reducing the prior variance). This biases the model to learn parameters closer to $0$ and hence reduces model variances (since the parameters cannot vary wildly to large values). Reduction of model variance is by definition the deterrence of overfitting. Note that this comes at the cost of increased model bias.
+
+Gaussian priors lead to $L_2$ regularizers. In contrast, a Laplace distribution -- whose log scales linearly with the parameters -- leads to $L_1$ regularizers. To be somewhat more pedantic, the $L_1$ norm of a vector is the sum of the absolute components, and the $L_2$ norm of the vector is the square-root sum of the squares of the components.
+
+Data augmentation improves accuracy differently. In data augmentation, we assume the existence of symmetries in the data set. For example, for every image in the data set with a given class label, we assume that all affine transformations of the image are also in the data set with the same class label. This is based on the idea that the class label of an image is invariant under such transformations; e.g., a ``0'' is a zero regardless of its position, orientation, or scale in an image. Data augmentation can therefore be used to increase the size of the training set, and larger training sets improve performance since NNs are unbiased estimaters. Moreover, data augmentation can help NNs be robust to variations due to these symmetries. For example, an NN trained on the augmented MNIST will more easily be able to recognize shifted or slightly rotated digits than NNs trained on the original MNIST. In other words, augmentation helps to improve generalizability.
+
+
+\subsection{Effect of hidden layers}
+
+I took the $L_1$-regularized NN, added one hidden layer with 30 neurons, and trained it on the augmented data set. I repeated the experiment after adding a second hidden layer of 30 neurons. Test accuracies for these two models as well as the baseline (no hidden layers) are presented (Figure \ref{fig-1-3}).
+
+\begin{figure}
+\centering
+\includegraphics[width=4in]{../plots/1-3.png}
+\caption{\label{fig-1-3} Test accuracies after each epoch of training for NNs with zero, one, and two hidden layers. The zero-hidden-layer NN is the same as the $L_1$-regularized NN trained on the augmented MNIST in Task 1.2.}
+\end{figure}
+
+The addition of one hidden layer led to significant improvement in test accuracy. This supports the idea that the augmented data set is not linearly separable and therefore could not be separated by the zero-hidden-layer NN. The addition of a second hidden layer improves test accuracy somewhat more (97.1\%), but this is very small compared to the improvement gained by the first hidden layer. Moreover, the two-hidden-layer NN converges in half the number of epochs as the single-hidden-layer NN.
+
+For the two-hidden-layer NN, I also calculated the rates of change of the hidden neurons. In particular, I logged the magnitudes of two gradients at each mini-batch step-- the gradient of the cost with respect to the biases of the first hidden layer, and the gradient of the cost with respect to the biases of the second hidden layer. I averaged the gradient magnitudes for the mini-batches for each epoch. The trends of the gradient magnitudes during training are presented (Figure \ref{fig-1-3-grads}).
+
+\begin{figure}
+\centering
+\includegraphics[width=4in]{../plots/1-3-grads.png}
+\caption{\label{fig-1-3-grads} The magnitudes of the cost gradient with respect to each of the two hidden layers in the NN for each epoch.}
+\end{figure}
+
+For the first several epochs, the second hidden layer changes faster than the first hidden layer. This is consistent with the ``vanishing gradient problem''. Recall that sigmoid activations give rise to the derivative term $y(1-y)$ that saturates in the limits $y\rightarrow 0$ and $y\rightarrow 1$. We saw that using cross-entropy cost deters the vanishing gradients in the output layer. But of course this solution cannot be applied to hidden layers. The hidden layers therefore still lead to the problem that saturated neurons lead to vanishing gradients. Moreover, back-propagation collects products of the derivative terms at each iteration so that earlier layers (layers closer to the input) have even smaller gradients. This is what we observe for the first several epochs. But we see that after some number of epochs, the first hidden layer changes faster than the second. This is in contradiction to the vanishing gradient problem, and it is unclear why this is happening. It is possible that the weights in the second layer are much greater than the weights in the third layer. In back-propagation, this could cause the gradients with respect to the first hidden layers to be large despite saturated activations.
+
+I finally trained the two-hidden-layer NN on the augmented MNIST using dropout. Test accuracies for different dropout rates are presented where the baseline (dropout rate of $0$) is a copy of the two-hidden-layer NN described above (Figure \ref{fig-1-3-dropout}).
+
+\begin{figure}
+\centering
+\includegraphics[width=4in]{../plots/1-3-dropout.png}
+\caption{\label{fig-1-3-dropout} Test accuracies after each epoch of training for a two-hidden-layer NN trained with various dropout rates.}
+\end{figure}
+
+We see that dropout was unable to  improve the performance as compared to the baseline. Moreover, convergence is much slower with dropout. Performance gets worse as the dropout rate is increased. As with $L_1$ and $L_2$ regularization, it could be the case that dropout is effective only when other hyperparameters such as learning rate are also adjusted. Further experiments would be needed to confirm this.
+
+Dropout provides regularization and helps to deter overfitting but does so differently from $L_1$ and $L_2$ regularization. Since hidden neurons are randomly dropped, dropout effectively generates an ensemble of NN models. Ensemble methods help to decrease model variance by exploiting a simple statistical principle-- the average of many samples (in this case, the samples are themselves models) has lower variance than any one sample. Indeed, this is the core idea of the celebrated Central Limit Theorem.
+
+\section{Convolutional neural network}
+
+I implemented LeNet-5 on MNIST. It is critical to note that I realized only recently that the provided code loops over only 200 mini-batches-- not epochs. Each mini-batch has size 50, so that with 200 mini-batches, only about 16\% of the training data was actually used; i.e., the CNN model was trained for only $\dfrac{1}{6}$ of an epoch.
+
+\begin{figure}
+\centering
+\includegraphics[width=4in]{../plots/2-1.png}
+\caption{\label{fig-2-1} Test accuracies after each epoch of training for LeNet-5.}
+\end{figure}
+
+Despite the very short training time, the CNN achieves a test accuracy of 96.3\%. It suggests that if the model were trained for a complete epoch or multiple epochs, the test accuracy would easily exceed that of the fully-connected NN.
+
+The CNN (probably) performs better because it performs ``smarter'' feature extraction from the input images. A fully-connected NN is invariant to permutations of the input neurons and hence is unable to utilize the spatial information in the input. In contrast, the CNN is able to extract features that reflect the spatial topology of the input images. Moreover, CNNs implement local translational invariance (see below) and are therefore more robust to translational variations and generalize better to translationally altered test inputs.
+
+\section{How to improve convolutional neural networks: My thoughts}
+
+I will share a mathematical perspective as I have a background in mathematics. A very important branch of mathematics is group theory. Group theory provides mathematical machinery to formally study and manipulate symmetries. The action of a group on a space partitions the space into orbits. An orbit is a subspace that is connected by symmetries; i.e., given any two objects of an orbit, there is a transformation in the group that maps one object onto the other.
+
+CNNs effectively implement translational symmetries for each feature that is detected in the input image. Consider a CNN with global max pooling. Thanks to convolution, at least one neuron will fire when a feature is detected regardless of its location in the input image. Global max pooling then returns an activation without regard to the location of the detected feature. The CNN therefore returns the same class label regardless of translations applied to the input image. In practice, we often do not want complete translational invariance of all features. We therefore restrict ourselves to local symmetries through local pooling.
+
+Once we realize that a CNN is just implementing the translation group, it seems natural to implement other symmetries as well such as rotations. Such an architecture would then not require data augmentation and will also let us understand what kind of symmetries are present in the data. Such ``generalized'' CNNs exist in the literature, but none have caught on in the mainstream. Even Hinton's capsule networks can be understood as encoding symmetries in the orientation of feature vectors-- an idea that already exists in quantum mechanics. But once again, capsule networks have not caught on yet. Nevertheless, I think that symmetries should be taken very seriously in machine learning as they help to provide structure to the data and the problem.
+
+\end{document}

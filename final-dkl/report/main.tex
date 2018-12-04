@@ -1,0 +1,338 @@
+\documentclass{article}
+
+% if you need to pass options to natbib, use, e.g.:
+% \PassOptionsToPackage{numbers, compress}{natbib}
+% before loading nips_2018
+\PassOptionsToPackage{numbers, compress}{natbib}
+
+% ready for submission
+%\usepackage{nips_2018}
+
+% to compile a preprint version, e.g., for submission to arXiv, add
+% add the [preprint] option:
+%\usepackage{nips_2018}
+
+% to compile a camera-ready version, add the [final] option, e.g.:
+\usepackage[final]{nips_2018}
+
+% to avoid loading the natbib package, add option nonatbib:
+% \usepackage[nonatbib]{nips_2018}
+
+\usepackage[utf8]{inputenc} % allow utf-8 input
+\usepackage[T1]{fontenc}    % use 8-bit T1 fonts
+\usepackage{hyperref}       % hyperlinks
+\usepackage{url}            % simple URL typesetting
+\usepackage{booktabs}       % professional-quality tables
+\usepackage{amsfonts}       % blackboard math symbols
+\usepackage{nicefrac}       % compact symbols for 1/2, etc.
+\usepackage{microtype}      % microtypography
+
+% my packages
+\usepackage{amsmath}
+\usepackage{graphicx}
+\usepackage{tikz}
+\usetikzlibrary{shapes, arrows}
+
+% my custom commands
+\newcommand{\RR}{\mathbb{R}}
+\newcommand{\calN}{\mathcal{N}}
+\newcommand{\eps}{\varepsilon}
+\newcommand{\sig}{\sigma}
+
+
+\title{Deep kernel learning for uncertainty quantification}
+
+% The \author macro works with any number of authors. There are two
+% commands used to separate the names and addresses of multiple
+% authors: \And and \AND.
+%
+% Using \And between authors leaves it to LaTeX to determine where to
+% break the lines. Using \AND forces a line break at that point. So,
+% if LaTeX puts 3 of 4 authors names on the first line, and the last
+% on the second line, try using \AND instead of \And before the third
+% author name.
+
+%%\author{%
+  %%Devanshu~Agrawal\thanks{Use footnote for providing further
+    %%information about author (webpage, alternative
+    %%address)---\emph{not} for acknowledging funding agencies.} \\
+\author{Devanshu~Agrawal\\
+  The Bredesen Center\\
+  University of Tennessee\\
+  Knoxville, TN 37996\\
+  \texttt{dagrawa2@vols.utk.edu} \\
+}
+
+\begin{document}
+% \nipsfinalcopy is no longer used
+
+\maketitle
+
+\begin{abstract}
+Deep kernel learning (DKL) is a framework that combines the hierarchical feature extraction capabilities of deep neural networks (NNs) and the Bayesian-probabilistic nature of Gaussian processes (GPs) to build powerful hybrid models that are more robust to overfitting than traditional NNs. However, current DKL models use an inducing points approximation that restricts the GP input dimension to at most 10, and the GP kernel must be stationary and factorizable over dimensions. We propose a simple DKL model that makes no use of inducing points and is trained with stochastic gradient descent with minibatches. We also use the ``neural network Gaussian process'' (NNGP) kernel that is derived from infinitely wide Bayesian multi-layer perceptrons. Our DKL-NNGP model achieves better accuracy than both traditional NNs as well as DKL-RBF (DKL model with RBF kernel) on the CIFAR10 and MNIST Fashion data sets. We also eevaluate the potential of our DKL model for uncertainty quantification (UQ, which is vital for sensitive applications such as medical diagnosis. We found our DKL-NNGP model to offer better UQ than traditional NNs based on a newly proposed UQ metric calculated in terms of accuracy-rejection curves.
+\end{abstract}
+
+\section{Introduction}
+% What is the problem that you are trying to solve? What's the state-of-the-art? Issues with state-of-the-art? Your approach? Summary of contribution
+
+Deep neural networks have become very popular models thanks to their state-of-the-art performance on many practical problems in computer vision and natural language processing \cite{krizhevsky2012imagenet, antipov2015learned, liang2017text}. Uncertainty quantification )UQ) in model prediction can be critical in certain applications such as automated vehicles or medical diagnosis. A common approach to UQ for classification tasks is to interpret the softmax probability of the predicted class as a confidence score. However, it has been shown that softmax probabilities are not calibrated and that softmax confidence scores fall below the optimal theoretical confidence measure \cite{guo2017calibration}. The purpose of this paper is to help make progress towards an NN model that offers reliable UQ in the form of better confidence scores along with its predictions.
+
+Our approach to the problem is to cast NNs in a Bayesian framework. There are several motivations for this approach:
+\begin{enumerate}
+\item Bayesian models are more robust to overfitting.
+\item Bayesian models return predictive distributions whose variances offer a natural measure of uncertainty.
+\item Bayesian models are more robust against adversarial attacks.
+\item A Bayesian formulation of NNs could help to shed light on certain theoretical properties of NNs.
+\end{enumerate}
+We will focus on the first two advantages in this work. One method to combine NNs and Bayesian probability is called deep kernel learning (DKL) (see Section \ref{section-rw} for a more detailed exposition). We propose a DKL model that is simpler than existing DKL models but that still performs better than traditional NNs.
+
+Our key contributions are the following:
+\begin{enumerate}
+\item We introduce a new DKL model that incorporates a ``neural network Gaussian process'' (NNGP) classifier (see Section \ref{section-rw} for details).
+\item We propose a training method for DKL models that is simpler and more efficient than that for existing DKL models.
+\item We show that our DKL model outperforms traditional NN models both in terms of accuracy and UQ.
+\end{enumerate}
+
+\section{Related work}
+\label{section-rw}
+
+Perhaps the most common approach to combine NNs and Bayesian probability is to place prior distributions on the parameters of an NN; such a model is called a Bayesian neural network (BNN), and there is a large body of literature on the subject \cite{neal2012bayesian}. Unfortunately, the posterior distribution of a BNN cannot be obtained in closed form so that implementations of BNNs in practice often require approximations through sampling. For very large NNs like the ones used for image classification tasks, such sampling methods become computationally intensive, and training very large BNNs becomes impractical.
+
+A less obvious but perhaps more interesting approach to the problem stems from a fundamental connection between NNs and Bayesian nonparametrics. It is a celebrated result that a BNN with one hidden layer and Gaussian priors on its weights and biases converges in distribution to a Gaussian process (GP) \cite{neal1996priors, williams1997computing}. Recently, this result has been extended to architectures with more than one hidden layer \cite{LeeNNGP, MatthewsGhahramaniGPWide}. We will refer to the limiting GP model as a ``neural network Gaussian process'' (NNGP). The kernel of the NNGP depends on the activation function used in the NN and admits a closed form for some common activation functions such as ReLU.
+
+Ideas related to the NNGP model -- namely, the connection between deep NNs and kernel methods -- have proved fruitful for gaining insight into the inner workings of deep neural networks-- e.g., expressive power as a function of depth, optimal regularization coefficients, explanation of generalizability, etc \cite{cho2009kernel, raghu2016expressive, poole2016exponential, schoenholz2016deep, hazan2015steps}. However, NNGPs are not used much in practice. One reason is that the NNGP result holds only for fully connected layers. Extending the limit result to convolutional layers (with infinitely many filters) and finding an efficient implementation of the resulting model is work beyond the scope of this project.
+
+Rather than jumping to a fully Bayesian formulation of an NN, an alternative approach would be to first successfully develop an NN model that is at least partially Bayesian. For example, we could consider hybrid models that combine NNs with Gaussian processes in relatively straightforward ways. Perhaps the most interesting class of models that hybridize NNs and GPs falls under the brand of ``deep kernel learning'' (DKL) \cite{WilsonDKL, wilson2016stochastic, izmailov2017scalable, bradshaw2017adversarial}. A DKL model is just an NN whose output is fed directly into a GP. This works in principle for any NN architecture and any Gaussian process kernel. We can imagine, for example, a DKL model where a CNN is used as a feature extractor and a GP is used as a classifier. Such a model should have some of the benefits of a Bayesian model as listed above while still leveraging the feature extraction power of NNs.
+
+Much of the work on DKL models focuses on scalability. Vanilla GPs scale poorly to large data sets since GP inference involves a Cholesky decomposition of a large kernel matrix. The DKL model therefore implements inducing point approximation methods for GPs that treat a GP as a parametric model \cite{hensman2015scalable, titsias2009variational}. In particular, the DKL model is built on top of the ``kernel interpolation for scalable structured Gaussian process'' (KISS-GP) model \cite{wilson2015kernel}. The KISS-GP model allows DKL models to scale to very large data sets. Unfortunately, the KISS-GP approximation works well only if the output dimension of the NN part of a DKL model -- i.e., the input dimension to the GP part of the DKL model -- is small-- on the order of 10. In current DKL models, the GP is therefore forced to be a final layer that is attached to an already narrow output layer of the NN feature extractor. Furthermore, the KISS-GP approximation in DKL models relies on important assumptions about the kernel used-- namely, the kernel is stationary and is separable across dimensions \cite{wilson2015kernel}. These assumptions hold for the canonical kernel -- the radial basis function (RBF) kernel -- but notably do not hold for the NNGP kernel.
+
+DKL models have been shown to be more robust to overfitting as expected. However, their UQ potential has largely been unexplored. Even though traditional NN classifiers return softmax ``probabilities'', it has been shown that these probabilities are not calibrated; e.g., an output of $0.8$ for a positive outcome from a binary NN classifier does not mean that the test input has 80\% chance of being positive \cite{guo2017calibration}. We therefore proceed to introduce a DKL model that is free from some of the limitations of existing DKL models and to explore its potential for UQ.
+
+\section{Methods}
+
+\subsection{Gaussian processes}
+
+Here we briefly review GP inference and kernel functions; this exposition follows \citet{gpml}. Consider a data set $\{(x_i, y_i)\in \RR^D\times \RR^C\}_{i=1}^N$ of $N$ points. Let $X\in \RR^{N\times D}$ contain the input points as rows and $Y\in \RR^{N\times C}$ the output points as rows. Suppose now that we can model the data as
+\[ y_i = f(x_i) + \eps_i, \]
+where $f:\RR^D\mapsto\RR^C$ is a latent function and $\eps_i\sim\calN(0, \sig^2 I_c)$ is IID noise. Then $f$ is said to follow a GP prior with kernel $K:\RR^D\times\RR^D\mapsto \RR$ if for every component $f_c$ of $f$ and every collection $z_1,\ldots,z_n\in\RR^D$, we have
+\begin{equation}
+(f_c(z_1), \ldots, f_c(x_n)) \sim \calN(0, K(Z, Z)),
+\end{equation}
+where $K(Z, Z)$ has entries $K(z_i, z_j)$. GP inference together with a Gaussian likelihood function leads to a closed-form expression for the predictive distribution of outputs $Y_*$ on a test input set $X_*$: $Y_*\sim\calN(\mu_*, K_*)$ where
+\begin{align}
+\label{eq-ppd-mu}
+\mu_* &= K(X_*, X)[K(X, X)+\sig^2 I_N]^{-1} Y \\
+\label{eq-ppd-K}
+K_* &= [K(X_*, X_*)+\sig^2 I_{N_*}] - K(X_*, X) [K(X, X)+\sig^2 I_N]^{-1} K(X, X_*).
+\end{align}
+We observe that inference requires the Cholesky decomposition of the $N\times N$ matrix $K(X, X)+\sig^2 I_N$ where $N$ may be very large. This is the motivation for inducing points. However, for our DKL model, we will not use inducing points, as explained later.
+
+\subsection{Kernels}
+
+The canonical choice for the GP kernel is the radial basis function (RBF) kernel defined as
+\begin{equation}
+K(x, x^\prime; \phi) = c\exp\left(\frac{\Vert x-x^\prime\Vert^2}{2\ell^2}\right),
+\quad \phi = (c, \ell).
+\end{equation}
+The hyperparameter $\ell$ is called the length scale and describes the scale on which functions sampled from a GP with an RBF kernel are likely to fluctuate.
+
+Another more exotic kernel that we consider in this work derives from NN architectures directly. Here we only consider an MLP with one hidden layer and ReLU as the activation function. Suppose the MLP is Bayesian with one output neuron, $H$ hidden neurons, and Gaussian priors $\calN(0, v_b)$ on its biases, $\calN(0, v_w)$ on the weights in its first layer, and $\calN(0, \dfrac{v_w}{H})$ on the weights in its second layer. Then as $H$ tends to infinity, the distribution of the MLP converges to a GP with kernel
+\begin{equation}
+K(x, x^\prime; \phi) = v_b + v_w \frac{\sqrt{K^{(0)}(x, x)K^{(0)}(x^\prime, x^\prime)}}{2\pi} [\sin\theta + (pi-\theta)\cos\theta],
+\end{equation}
+where
+\begin{align}
+\theta &= \frac{K^{(0)}(x, x^\prime)}{\sqrt{K^{(0)}(x, x)K^{(0)}(x^\prime, x^\prime)}} \\
+K^{(0)}(x, x^\prime) &= v_b + v_w\langle x, x^\prime\rangle.
+\end{align}
+A GP with such a kernel is called a neural network Gaussian process (NNGP). Note that kernels can also be derived from deeper MLPs through a simple layer-by-layer recursion. However, we will restrict ourselves to considering NNGPs with only one hidden layer for simplicity.
+
+\subsection{Deep kernel learning models}
+
+Here we introduce the architecture of our DKL model. DKL is flexible in that it is in principle compatible with any NN architecture for supervised-learning. Consider an NN $h(\cdot; \omega):\RR^D\mapsto \RR^F$ with parameters $\omega$ meant to embed data into a feature space of dimension $F$. Consider also a GP with kernel $K(\cdot, \cdot; \phi):\RR^D\times\RR^D\mapsto \RR$ that has hyperparameters $\phi$. Then a DKL model is a GP with a ``deep kernel'' $\hat{K}$ defined as
+\begin{equation}
+\hat{K}(x, x^\prime; \theta) = K(h(x; \omega), h(x^\prime; \omega); \phi),
+\quad \theta = (\omega, \phi),
+\end{equation}
+where $\theta$ are the hyperparameters of the deep kernel. Note that the parameters of the NN are now included in the hyperparameters of the deep kernel.
+
+To ``train'' a DKL model now means optimization of its kernel hyperparameters. For GPs, this is typically done through maximal marginal likelihood (MML); this is equivalent to minimizing the loss function
+\begin{equation} \label{eq-loss}
+L(\theta; X, Y) = Y^\top (\hat{K}(X, X; \theta) + \sig^2 I_N)^2 Y + \log\operatorname{det}(\hat{K}(X, X; \theta)+\sig^2 I_N).
+\end{equation}
+Computation of this loss function requires the Cholesky decomposition of the $N\times N$ matrix $\hat{K}(X, X; \theta)+\sig^2 I_N$ where $N$ may be very large. As mentioned already, others have circumvented this computational obstacle through approximation methods that rely on inducing points. However, such methods have disadvantages as well. For example, the DKL model proposed by \citet{wilson2016stochastic} used a KISS-GP as the GP component; the KISS-GP allows scaling up to very large $N$ but is heavily constrained to low dimensions; A KISS-GP implemented on the feature space $\RR^F$ would require $F\leq 10$. Moreover, the KISS-GP model assumes that the kernel has certain structural properties that hold for an RBF kernel but fail for an NNGP kernel. \citet{bradshaw2017adversarial} takes a step back and implements an SVGP instead of a KISS-GP; the SVGP is less constrained in the number of features but is more constrained in the size of the data $N$.
+
+For our DKL model, we propose to go back one step further. We propose not to use inducing points at all. Instead, we optimize the loss function with stochastic gradient descent (SGD) with minibatches in the same fashion that NN models are trained. Let $\{(X_b, Y_b)\}_{b=1}^B$ be a partition of the data $(X, Y)$ into $B$ minibatches. Let $\theta_0$ be the deep kernel hyperparameters at the start of an epoch of training. Then during the epoch, we iteratively perform the updates
+\begin{equation}
+\theta_b = \theta_{b-1} - \alpha (\nabla_\theta L)(\theta_{b-1}; X_b, Y_b),
+\quad \mbox{ for } b=1,\ldots,B,
+\end{equation}
+where $\alpha$ is the learning rate. We shuffle the data at the start of each epoch.
+
+Unlike the loss functions that are typically used to train NN models, Equation \ref{eq-loss} is not a simple sum over the data. The theoretical justification for optimizing Equation \ref{eq-loss} with SGD is therefore unclear. Nevertheless, given its simplicity and straightforwardness, we thought it worth to explore such a training procedure and to at least evaluate its performance empirically.
+
+It should be noted that we still use Equations \ref{eq-ppd-mu}-\ref{eq-ppd-K} with DKL models to predict the distribution of outputs on a given input test set $X_*$. Prediction therefore still requires the Cholesky decomposition of an $N\times N$ matrix. However, our proposed method of training still retains the advantage that it does not require a Cholesky decomposition at every iteration of parameter update. Moreover, we will see in our experiments that a DKL model could be used to first pretrain the NN component $h(\cdot; \omega)$ of the model; once that is done, we can combine the $h(\cdot; \omega)$ (acting as a feature extractor) with an NN classifier and then fine-tune the network. Doing this, we will be able to do prediction with a standard NN model, circumventing the computational burden of GP inference.
+
+\section{Experiments}
+
+We ran experiments to compare the performance and behavior of three models:
+\begin{enumerate}
+\item NN: This is a standard convolutional neural network. The feature extractor part of the network is topped with two fully-connected layers along with a softmax layer that comprise the classifier for this model. We take the NN model to be our baseline.
+\item DKL-RBF: This is a DKL model that uses a GP with RBF kernel as the classifier.
+\item DKL-NNGP: This is a DKL model that uses an NNGP with one hidden layer as the classifier.
+\end{enumerate}
+The feature extractor networks of all three models are the same. Since we planned to test our models on image classification tasks, we selected a small VGG architecture for the feature network because of its effectiveness yet simplicity (Figure \ref{fig-vgg}).
+
+\begin{figure}
+\centering
+\tikzstyle{block} = [rectangle, draw, fill=blue!20,
+    text width=5em, text centered, rounded corners, minimum height=4em]
+\begin{tikzpicture}[node distance = 2cm, auto]
+%\scriptsize
+    % Place nodes
+    \node [block] (conv1) {2 conv modules \\ $3\times 3$ kernel \\ 32 channels};
+    \node [block, right of=conv1] (pool1) {Max pooling \\ $2\times 2$ kernel};
+    \node [block, right of=pool1] (conv2) {3 conv modules \\ $3x3$ kernel \\ 64 channels};
+    \node [block, right of=conv2] (pool2) {Max pooling \\ $2\times 2$ kernel};
+    % Draw edges
+\draw[<-] (conv1) edge (pool1) (pool1) edge (conv2) (conv2) edge (pool2);
+%    \path [line] (input) -- (feature);
+%    \path [line] (feature) -- (classifier);
+%    \path [line] (classifier) -- (output);
+\end{tikzpicture}
+\caption{\label{fig-vgg} Feature network architecture used for all our models. We chose a VGG architecture since we planned to test our models on image data.}
+\end{figure}
+
+We tested our models on two image classification tasks: CIFAR10 and MNIST Fashion. The CIFAR10 data set contains 60,000 training and 10,000 test color images (size $32\times 32$) of ten different classes of objects. The MNIST Fashion data set contains 50,000 training and 10,000 test greyscale images (size $28\times 28$) of ten different classes of clothing. MNIST Fashion serves as a drop-in replacement for the popular MNIST Handwritten Digits data set; the data set is structured in the same way but offers a more challenging classification problem \cite{xiao2017fashion}.
+
+During training, we evaluate our models on the test set. Recall that evaluation of our DKL models reqquires the Cholesky decomposition of an $N\times N$ matrix with $N$ the number of training points. To avoid this computational burden, we trained all three models on only 20\% of the CIFAR10 and MNIST Fashion training sets. We selected the 20\% subsets at random and maintained class balance. We also mapped the pixel values of all images to lie in the unit interval.
+
+\subsection{Accuracy and uncertainty quantification}
+
+We initialized the feature network parameters of all three models under a truncated normal distribution. We initialized the three classifiers as follows:
+\begin{enumerate}
+\item NN: Random sample under a truncated normal distribution.
+\item DKL-RBF: Set $c=1$ and
+\begin{equation}
+\ell = 0.1\sqrt{\frac{\sum_{i=1}^N \Vert x_i - \overline{x}\Vert^2}{N}},
+\end{equation}
+where $N$ is the size of the training set, $x_i$ is the $i$th image in the training set, and $\overline{x}$ is the pixel-wise mean image.
+\item DKL-NNGP: Set $v_b = v_w = 0.01$.
+\end{enumerate}
+
+On both CIFAR10 and MNIST Fashion, we trained all three models for 25 epochs with learning rate $\alpha = 0.001$ and minibatch size of $100$.
+
+We evaluated the models on the test sets after each epoch and recorded their test accuracies. We present the test accuracies of the models throughout training (Figure \ref{fig-accs}). Both DKL models outperform the NN baseline-- a possible result of improved robustness to overfitting through maximum marginal likelihood training. The NNGP kernel gives better performance than the RBF kernel.
+
+\begin{figure}
+\centering
+\includegraphics[width=.5\linewidth]{plots/c_accs.png}%
+\includegraphics[width=.5\linewidth]{plots/f_accs.png}
+\caption{\label{fig-accs} Test accuracies of the NN, DKL-RBF, and DKL-NNGP models after each training epoch on 20\% of CIFAR10 (left) and 20\% of MNIST Fashion (right). Both DKL models outperform the baseline NN. Between the DKL models, the NNGP kernel outperforms the RBF kernel.}
+\end{figure}
+
+To evaluate UQ, we constructed an accuracy-rejection curve (ARC) for each model (Figure \ref{fig-arc}). Each model produces a confidence score along with each prediction. The confidence measures used for each model are as follows:
+\begin{enumerate}
+\item NN: Softmax probability of predicted class.
+\item DKL-RBF: Mean over variance of predictive distribution for predicted class.
+\item DKL-NNGP: Mean over variance of predictive distribution for predicted class.
+\end{enumerate}
+At rejection rate $r$, the models withhold fraction $r$ of their predictions with the lowest confidence scores. Test accuracies are then calculated based on the remaining fraction $1-r$ of predictions with higher confidence scores. A good confidence measure will assign lower confidence to predictions that are more likely to be incorrect; thus, good ARCs are increasing.
+
+DKL-NNGP exhibits the highest and hence best ARC (Figure \ref{fig-arc}). This might suggest that the confidence measure of DKL-NNGP offers the best UQ. However, we also note that the ARCs of all three models are approximately parallel; DKL-NNGP might have the best ARC only on the grounds that it is the most accurate model.
+
+\begin{figure}
+\centering
+\includegraphics[width=.5\linewidth]{plots/c_arc.png}%
+\includegraphics[width=.5\linewidth]{plots/c_accs.png}
+\caption{\label{fig-arc} Test Accuracy against rejection rate for the NN, DKL-RBF, and DKL-NNGP models trained on 20\% of CIFAR10 (left) and 20\% of MNIST Fashion (right). All curves are increasing overall, suggesting decent performance of the confidence measures of all three models. The DKL models achieve greater test accuracy than the NN for any given rejection rate. Between the DKL models, the NNGP kernel achieves greater accuracy than the RBF for given rejection rate. It is unclear if these differences in UQ are due to differences in the confidence measures used or simply due to differences in model accuracy.}
+\end{figure}
+
+In order to determine if the difference in ARCs of the three models is solely due to differences in accuracy or if there are actual differences between the confidence measures the models employ, we tried to devise a scalar metric based on  the ARC that is independent of the accuracy that the model achieved. The metric -- termed the ARC score -- is the $L_1$ distance between the ARC and the oracle. The oracle is the ideal ARC that would result if every incorrect prediction had confidence $0$ and every correct prediction had confidence $1$. The oracle -- expressed as accuracy as a function of rejection -- is given by
+\begin{equation}
+\operatorname{oracle}(r) =
+\begin{cases}
+\frac{a(0)}{1-r} & \mbox{ if } 0 \leq r < 1-a(0) \\
+1 & \mbox{ if } 1-a(0) \leq r \leq 1,
+\end{cases}
+\end{equation}
+where $a(0)$ is the model accuracy (at rejection $0$). The $L_1$ distance between an ARC $r\mapsto a(r)$ and the oracle $r\mapsto \operatorname{oracle}(r)$ takes the form
+\begin{equation}
+\operatorname{ARC\_score}(a) = a(0)[1-\log a(0)] - \int_0^1 a(r)\,\mathrm{d}r.
+\end{equation}
+We approximated the integral on the right with a trapezoid sum.
+
+We present the ARC scores of the three models on both CIFAR10 and MNIST Fashion (Table \ref{table-arc-scores}). DKL-NNGP achieves the best (lowest) ARC score, suggesting that the confidence measure used by DKL-NNGP is more reliable than those used by the NN and DKL-RBF models.
+
+\begin{table}
+\centering
+\caption{\label{table-arc-scores} ARC score of the NN, DKL-RBF, and DKL-NNGP models on the test sets of CIFAR10 and MNIST Fashion. The ARC score is defined as the area between the ARC and the oracle curve. Smaller ARC scores indicate better measures of confidence. DKL-NNGP exhibits the best ARC scores on both data sets.}
+\begin{tabular}{|c|c|c|c|} \hline
+\quad & NN & DKL-RBF & DKL-NNGP \\ \hline
+CIFAR10 & 0.15696 & 0.11555 & 0.08772 \\ \hline
+Fashion & 0.01724 & 0.01942 & 0.01853 \\ \hline
+\end{tabular}
+\end{table}
+
+\subsection{Feature networks}
+
+We wanted to know if the differences in performance among the three models as discussed above are due to the different classifiers (i.e., the GP classifiers are better than the NN classifier) or or are instead due to the different methods of training (i.e., maximal marginal likelihood is better than minimum cross entropy). In particular, does the DKL-NNGP model perform best because it finds more robust features?
+
+We therefore wanted to compare the trained feature networks of the three models. To this end, we took the three trained feature networks and transfered them onto three copies of a freshly initialized NN model. Holding the feature network part fixed, we fine-tuned the last two layers of the three NN models-- i.e., the classifier parts. We performed this fine-tuning on 20\% of the CIFAR10 and MNIST Fashion data sets and recorded the performance of the models on the test sets (Figure \ref{fig-t-accs}).
+
+On CIFAR10, the NN model with features transfered from DKL-RBF starts at low accuracy but quickly improves with training to catch up with the baseline NN model (Figure \ref{fig-t-accs}). This suggests that the features learned through the RBF-GP classifier are not well-suited for a traditional NN model. However, the NN model with features transfered from DKL-NNGP outperforms the baseline NN model. This suggests that DKL-NNGP learns features that are more robust than those learned with a traditional NN. Moreover, these features are well-suited for transfer onto a traditional NN.
+
+In contrast, on MNIST Fashion, the results are less conclusive; the NN models with features transfered from the DKL models do not show an advantage over the NN model baseline.
+
+\begin{figure}
+\centering
+\includegraphics[width=.5\linewidth]{plots/tc_accs.png}%
+\includegraphics[width=.5\linewidth]{plots/tf_accs.png}
+\caption{\label{fig-t-accs} Test accuracies of three NN models whose feature network parts are initialized and fixed to the feature network parts of trained NN, DKL-RBF, and DKL-NNGP models after each training epoch on 20\% of CIFAR10 (left) and 20\% of MNIST Fashion (right). On CIFAR10, the DKL-RBF-initialized model starts at a significantly lower accuracy than the other models but quickly catches up. The DKL-NNGP-initialized model significantly outperforms the other models. On MNIST Fashion, the results are less conclusive as the DKL-initialized models do worse.}
+\end{figure}
+
+\subsection{Varying minibatch size}
+
+Recall that we trained the DKL models -- i.e., optimized the kernel hyperparameters -- through maximal marginal likelihood with SGD and minibatches. Using one minibatch -- i.e., batch training -- is theoretically justified. However, as noted earlier, it is not obvious if training with multiple minibatches that are proper subsets of the training set is theoretically justifiable. We therefore trained and evaluated our models over several minibatch sizes to gauge how minibatch training differs from batch training.
+
+We present the optimal kernel hyperparameters for DKL-RBF and DKL-NNGP (not including the feature network parameters) obtained with minibatch training on 20\% of CIFAR10 for various minibatch sizes (Figure \ref{fig-mb-params}). The key observation is that the optimal hyperparameter values vary with minibatch size and begin to converge only near the largest minibatch size. This means that applying minibatch training to DKL models results in optimal hyperparameters different from what would be obtained with batch training-- a method that has no theoretical issues. However, we note that the optimal hyperparameters of the base kernel depend on how the data is embedded into feature space through the feature network. In other words, the kernel hyperparameters may be varying because using different minibatch sizes also results in varying feature networks.
+
+\begin{figure}
+\centering
+\includegraphics[width=.5\linewidth]{plots/mb_rbf_params.png}%
+\includegraphics[width=.5\linewidth]{plots/mb_nngp_params.png}
+\caption{\label{fig-mb-params} Optimal kernel hyperparameters (not including feature network parameters) of the DKL-RBF (left) and DKL-NNGP (right) models trained on 20\% of CIFAR10 for various minibatch sizes. The hyperparameters vary with minibatch size and begin to converge only near the largest minibatch size.}
+\end{figure}
+
+We also recorded the test accuracies of all three models after training with various minibatch sizes (Figure \ref{fig-mb-accs}). The accuracies of all three models decrease as minibatch size approaches its maximum value. This is likely because we used a fixed number of training epochs (25); thus, as we increase the minibatch size, the total number of updates made to model parameters during training decreases. As a result, for large minibatch sizes, the models have not fully trained in 25 epochs, and this manifests as poor test accuracy. Nevertheless, it is interesting to note that while the optimal kernel hyperparameters of the DKL models vary with minibatch size, their test accuracies are mostly stable up to the larger minibatch sizes. Furthermore, the decline in accuracy of the NN model is much more dramatic than those of the DKL models. This suggests that DKL models achieve better accuracy more quickly when compared to a traditional NN baseline when using large minibatch sizes. This could be because large minibatch sizes cause the NN model to overfit, while the DKL models remain robust.
+
+Finally, we note an anomalous drop in test accuracy of the DKL-RBF for medium minibatch sizes; this is a point that we plan to investigate in future work.
+
+\begin{figure}
+\centering
+\includegraphics[width=0.8\linewidth]{plots/mb_accs.png}
+\caption{\label{fig-mb-accs} Test accuracies of the NN, DKL-RBF, and DKL-NNGP models trained on 20\% of CIFAR10 for various minibatch sizes. The decrease in accuracy for large minibatch sizes is likely due to fewer parameter updates during training. The drop in accuracy of the RBF-DKL for medium minibatch sizes is an anomaly to be explored in future work.}
+\end{figure}
+
+\section{Discussion}
+%problems existed in your approach, how it might be fixed in future works
+
+The combination of deep NN models and Bayesian probability has much to offer including increased robustness to overfitting and potential for UQ. DKL is a simple framework that augments existing NN architectures with GP classifiers so that the resulting models can be trained with maximum marginal likelihood.
+
+We proposed a new DKL model that is trained with minibatch-SGD and with no inducing point approximation. Although we currently have no theoretical justification for this training procedure, we observed in our experiments that our DKL models often outperform traditional NN models; we understand this empirical observation as a motivation to investigate the theory of minibatch-SGD and its application to DKL.
+
+Our training method also allowed us to implement DKL models with non-stationary kernels such as the NNGP kernel; this is not possible with previous DKL models as they rely on the KISS-GP approximation. We found that our DKL model performed significatnly better with the NNGP kernel compared to the RBF kernel both in terms of accuracy as well as UQ (as measured by our  proposed ARC score metric).
+
+One disadvantage of our model is that it does not scale well to laarge training sets. However, scalability is an issue only at prediction time-- not during training. Based on our results, we propose the following pipeline that also circumvents the scalability issue:
+\begin{enumerate}
+\item Train a DKL model with an NNGP kernel on data.
+\item Transfer the trained features onto an untrained NN model.
+\item Fine-tune the classifier part of the NN model, and then fine-tune the entire network end-to-end.
+\item Use the NN model for prediction.
+\end{enumerate}
+For future work, we plan to implement this pipeline and will test it on larger data sets. Our conclusions here are based on only two similar data sets. We hope that additional experiments on a larger variety of data sets based on the above proposed pipeline will help corroborate our findings here.
+
+\bibliographystyle{plainnat}
+\bibliography{references}
+
+\end{document}

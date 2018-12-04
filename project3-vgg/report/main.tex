@@ -1,0 +1,66 @@
+\documentclass[11pt]{article}
+\usepackage[margin=0.9in]{geometry}
+\usepackage{amsmath, graphicx}
+%\usepackage{setspace}
+%\doublespacing
+
+\title{ECE 692 Project 3: VGGNet on CIFAR-10}
+\author{Devanshu Agrawal}
+\date{October 12, 2018}
+
+\begin{document}
+\maketitle
+
+\section{Training VGGNet from scratch}
+
+I started with Frossard's code for VGG16 that I found in the lecture notes. I modified the input dimensions to $32\times 32$ and the output dimension to $10$. I used a learning rate of $10^{-4}$ and mini-batch size of $100$. I implemented early stopping with a 5-epoch window. I obtained very poor performance-- the test accuracy started out low but then steadily decreased with training time (Figure \ref{fig-scratch-vgg16} red).
+
+I then realized that Frossard's code did not contain batch normalization or dropout since his code originally implemented only prediction. I added batch normalization and dropout after evry activation layer, but I did not add a dropout layer before pooling. This is the same architecture that gave another student in the class a test accuracy of 0.93. But I observed very poor performance. The test accuracies hovered close to 0.1-- no better than random guessing (Figure \ref{fig-scratch-vgg16} green). I tried to decrease the learning rate down to $10^{-5}$ but saw no improvement (Figure \ref{fig-scratch-vgg16} blue).
+
+\begin{figure}
+\centering
+\includegraphics[width=4in]{../plots/scratch-vgg16.png}
+\caption{\label{fig-scratch-vgg16} Test accuracies of various VGG16 models trained from scratch (see text for detailed descriptions).}
+\end{figure}
+
+I then switched gears and tried a smaller model-- VGG7. This model has two convolutional modules-- one with two convolutional layers and the next with three convolutional layers. Thus, there are two pooling layers. The classifier part comprises two FC layers. The rationale for this architecture is the following: The two pooling layers will reduce a $32\times 32$ input down to $8\times 8$. This is approximately the same size to which a $224\times 224$ input to VGG16 for ImageNet is reduced.
+
+VGG7 achieves significantly better performance than VGG16 but is still dismal compared to the top scores on the leaderboard (Figure \ref{fig-scratch-vgg7} red). Adding batch normalization and dropout led to a considerable improvement in accuracy (Figure \ref{fig-scratch-vgg7} green).
+
+\begin{figure}
+\centering
+\includegraphics[width=4in]{../plots/scratch-vgg7.png}
+\caption{\label{fig-scratch-vgg7} Test accuracies of two VGG7 models trained from scratch (see text for detailed descriptions).}
+\end{figure}
+
+I tried other tweeks to the above models as well. For the above models, I centered the data by subtracting the channel-wise means. But I also tried to just map the images to the unit hypercube. For VGG7, this resulted in a test accuracy of about 0.65-- significantly better than VGG7 trained on centered inputs but still worse than VGG7 with batch normalization and dropout. For the VGG7 model with inputs mapped to the unit hypercube, I also tried to incorporate learning rate decay; this boosted the test accuracy to 0.67. It therefore appears that how data is standardized has a considerable impact on performance.
+
+For future work: I am convinced there is a subtle bug in my VGG16 code. Since VGG7 appears to work, my idea is to incrementally add convolutional layers to VGG7 and confirm that performance is maintained until I construct all of VGG16.
+
+
+\section{VGGNet with pretrained weights}
+
+I used Frossard's VGG16 code so that there is no batch normalization or dropout. I resized the images as mini-batches to $224\times 224$ with linear interpolation. I tested three pretrained models: (1) Retrained the last FC layer only; (2) retrained the last two FC layers only; (3) retrained the last three FC layers only (Figure \ref{fig-pretrained} red, green, and blue respectively). Test accuracies are significantly better than those obtained by training from scratch. Retraining two or three FC layers worked the best. We conclude that pretraining is very useful as it leads to higher accuracy. We additionally note that the pretrained models converge in far fewer epochs than models trained from scratch.
+
+\begin{figure}
+\centering
+\includegraphics[width=4in]{../plots/pretrained.png}
+\caption{\label{fig-pretrained} Test accuracies of pretrained VGG16 models for various numbers of retrained FC layers.}
+\end{figure}
+
+
+\section{Summaries of important CNN architectures}
+
+\textbf{LeNet-5:} This architecture set the basic foundation for CNN architectures. It comprises three convolutional modules followed by three FC layers. The hyperbolic tangent was used as the activation. It achieved top performance on MNIST.
+
+\textbf{AlexNet:} As image classification tasks grew more difficult, greater processing (i.e., deeper architectures) was needed. LeNet-5 could not provide this. AlexNet can be considered the first modern CNN architecture. It won the ImageNet challenge in 2012 and brought CNNs into the mainstream. AlexNet comprises of five convolutional modules and two FC layers. It replaced sigmoid and tanh activations with relu, which helps to deter the vanishing gradient problem and is also computationally cheaper. AlexNet also uses dropout to deter overfitting. AlexNet set the trend to build deeper CNNs.
+
+\textbf{VGGNet:} The key to better CNN architectures is to go deeper. But going deeper is nontrivial because deeper architectures are harder to train. VGGNet can go much deeper than AlexNet (the most popular versions have 16 or 19 layers). It achieves this by restricting the convolutional kernel size to $3\times 3$. Convolutional modules with $3\times 3$ kernels can be composed together to obtain effectively larger receptive fields. Therefore, VGGNet deepens AlexNet by expanding each convolutional module of AlexNet into a composition of $3\times 3$-kernel convolutional layers. This also has the advantage that additional activation layers can be introduced between the convolutional modules-- increasing expressive power. The total number of parameters is also reduced. VGGNet placed second in the 2014 ImageNet challenge.
+
+\textbf{GoogleNet:} GoogleNet has depth on a comparable scale to VGGNet. The most interesting aspect of GoogleNet is its considerable reduction in the number of parameters-- especially given the number of convolutional kernels it is able to apply. At the core of GoogleNet is the ``inception module''. An inception contains multiple convolutional kernels of different sizes all applied in parallel. This would ordinarily result in a very large number of parameters. The inception module circumvents this through the application of a ``bottleneck layer''-- which applies $1\times 1$ convolution to effectively reduce the number of channels in the input tensor. In addition, GoogleNet replaces the FC layers at the end with global average pooling; this also reduces the number of parameters significantly. GoogleNet won the 2014 ImageNet challenge.
+
+\textbf{ResNet:} The ResNet goes even deeper through the introduction of the ``residual module'' that solves the degradation problem. The residual module is built on the following intuition: Suppose a layer has a structure so that it is able to represent the identity map. Then the weights of this layer should be initialized so that the layer is the identity map. This will guarantee that the network will do no worse than if the layer were not present in the network; performance can only get better as the layer is trained. In a residual moduel, the input not only passes through a traditional layer but the input is also summed directly to the output of the module. This effectively forces the module to represent the difference or ``residual'' in the input and output, which the authors argue is easier to learn than the mapping from input to output itself. ResNet won the 2015 ImageNet challenge.
+
+\textbf{SENet:} This is the squeez-excitation network. This network introduces the SE module that can be incorporated into existing architectures to boost performance. In non-SE architectures, the convolutional feature maps in a convolutional layer are equally weighted. In an SENet, an importance score is computed for each feature map, and each feature map is then weighted by its respective importance. The importances are computed by squeezing the feature maps down to scalars and then passing the resulting vector of scalars through an NN. ResNet50 augmented with the SE module was shown to perform as wel as ResNet121. SENet won the 2017 ImageNet challenge.
+
+\end{document}weighted by this 

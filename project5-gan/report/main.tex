@@ -1,0 +1,62 @@
+\documentclass[11pt]{article}
+\usepackage[margin=0.9in]{geometry}
+\usepackage{amsmath, graphicx}
+%\usepackage{setspace}
+%\doublespacing
+
+\title{ECE 692 Project 5: Generative adversarial networks}
+\author{Devanshu Agrawal}
+\date{November 9, 2018}
+
+\begin{document}
+\maketitle
+
+\section{DCGAN on MNIST}
+
+I trained an unconditional DCGAN on MNIST for 25 epochs. I generated 64 images after every minibatch of training as well as hundreds of images after training was complete. Figure \ref{fig-uncond} shows how the quality of the generated images changes as the DCGAN trains. We see examples of all digits being generated; it therefore seems that mode collapse was avoided.
+
+\begin{figure}
+\centering
+\begin{tabular}{c|c}
+\includegraphics[width=2.5in]{../results_task_1/samples/train_00_0999.png} & \includegraphics[width=2.5in]{../results_task_1/samples/train_04_0927.png} \\ \hline
+\includegraphics[width=2.5in]{../results_task_1/samples/train_08_0955.png} & \includegraphics[width=2.5in]{../results_task_1/samples/train_12_0983.png} \\ \hline
+\includegraphics[width=2.5in]{../results_task_1/samples/train_16_0911.png} & \includegraphics[width=2.5in]{../results_task_1/samples/train_20_0939.png} \\ \hline
+\includegraphics[width=2.5in]{../results_task_1/samples/train_24_0967.png} & \includegraphics[width=2.5in]{../results_task_1/samples/test_arange_50.png}
+\end{tabular}
+\caption{\label{fig-uncond} Generated images at various stages of training. Going left to right and top to bottom, the first seven batches of images were generated after the last minibatch of training of epochs 1, 5, 9, 13, 17, 21, and 25 respectively. The eighth batch of images was generated after training was complete. Each batch contains 64 images. We see that the quality of the images generally improves with training.}
+\end{figure}
+
+\section{Conditional DCGAN on MNIST}
+
+I also trained a conditional DCGAN on MNIST for 25 epochs. I generated 64 images after every minibatch of training as well as hundreds of images after training was complete. Figure \ref{fig-cond} shows how the quality of the generated images changes as the DCGAN trains. We see examples of all digits being generated; it therefore seems that mode collapse was avoided. The results do not look significantly different from those of the unconditional DCGAN.
+
+\begin{figure}
+\centering
+\begin{tabular}{c|c}
+\includegraphics[width=2.5in]{../results_task_2/samples/train_00_0999.png} & \includegraphics[width=2.5in]{../results_task_2/samples/train_04_0927.png} \\ \hline
+\includegraphics[width=2.5in]{../results_task_2/samples/train_08_0955.png} & \includegraphics[width=2.5in]{../results_task_2/samples/train_12_0983.png} \\ \hline
+\includegraphics[width=2.5in]{../results_task_2/samples/train_16_0911.png} & \includegraphics[width=2.5in]{../results_task_2/samples/train_20_0939.png} \\ \hline
+\includegraphics[width=2.5in]{../results_task_2/samples/train_24_0967.png} & \includegraphics[width=2.5in]{../results_task_2/samples/test_arange_50.png}
+\end{tabular}
+\caption{\label{fig-cond} Generated images at various stages of training. Going left to right and top to bottom, the first seven batches of images were generated after the last minibatch of training of epochs 1, 5, 9, 13, 17, 21, and 25 respectively. The eighth batch of images was generated after training was complete. Each batch contains 64 images. We see that the quality of the images generally improves with training.}
+\end{figure}
+
+\section{The problem of mode collapse}
+
+By ``instability'', Arjovsky and Goodfellow are referring to the phenomenon of ``mode collapse'' or ``mode dropping''. This is when the generator part of a GAN generates images that are all near one mode so that the images all look the same; i.e., the learned distribution fails to capture diversity in the data.
+
+The reason for this instability comes down to the rates at which the generator and discriminator are trained. Imagine the following: Suppose the discriminator is fixed and we just optimize the generator. The discriminator defines a decision boundary between fake and real images. Then to optimize the generator, we simply concentrate the probability mass on the region furthest from the decision boundary on the real images side. The problem is that there is then no insentive for the generator to learn multiple modes.
+
+Arjovsky talks about the problem theoretically. Arjovsky shows that there is a problem because the error of the discriminator has a theoretical bound that it violates in practice. He says this is because the true and generative probability distributions are either discontinuous or have disjoint support. He argues that this can easily happen if the distributions are constrained to low-dimensional submanifolds that can be easily separated by a discriminator network.
+
+Arjovsky identifies the problem to be that as the discriminator learns, gradient flow to the generator becomes poor. So, one approach to improve stability is to promote better gradient flow to the generator. Radford designed the DCGAN to do this. He used a convolutional architecture with features that help with training:
+\begin{itemize}
+\item Replace pooling with strided convolution.
+\item Use batch normalization.
+\item Get rid of fully connected layers.
+\end{itemize}
+All of this empirically helped to prevent mode collapse.
+
+Mirza developed the conditional GAN, which also helps to combat mode collapse. The idea is for the generator to learn a distribution for every class of images. This way, the overall distribution has at least one mode for each class.
+
+\end{document}

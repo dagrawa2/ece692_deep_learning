@@ -1,0 +1,62 @@
+\documentclass[11pt]{article}
+\usepackage[margin=0.9in]{geometry}
+\usepackage{amsmath, graphicx}
+%\usepackage{setspace}
+%\doublespacing
+
+\title{ECE 692 Project 4: Denoising autoencoders on CIFAR-10}
+\author{Devanshu Agrawal}
+\date{October 26, 2018}
+
+\begin{document}
+\maketitle
+
+\section{Using a denoising autoencoder to improve VGG7}
+
+This section considers VGG7, which has the following architecture: Two convolutional modules, max pooling, three convolutional modules, max pooling, and two fully-connected modules. The goal is to use denoising autoencoders (DAEs) to improve the performance of this model.
+
+I implemented a DAE whose encoder part has the following architecture: Corruption module that adds Gaussian noise to each input pixel, two convolutional modules, max pooling, and three convolutional modules. The encoder therefore includes the five convolutional modules of VGG7. The decoder reverses the order of these modules, replaces convolutions with deconvolutions, replaces pooling with upsampling, discards the corruption module, and includes sigmoid activation at the end. I used sigmoid activation at the end because I preprocessed CIFAR-10  by linearly mapping all images into the unit hypercube. I trained the encoder-decoder network through $L_2$-loss minimization. I monitored the $L_2$ loss per image on the test set during training (Figure \ref{fig-vgg7-ae}. The number of epochs is determined by early stopping with a window of five epochs.
+
+\begin{figure}
+\centering
+\includegraphics[width=3in]{../plots/vgg7-ae-losses.png}
+\caption{\label{fig-vgg7-ae} Test $L_2$ loss per image while training a DAE for later use in VGG7.}
+\end{figure}
+
+Note that I originally trained a DAE that included an additional max pooling and fully-connected layer-- i.e., all of VGG7 except the last layer. But the loss would not go below 450. This was likely due to having two max pooling layers, which cannot be inverted exactly. By instead including only one max pooling layer, I was able to achieve much lower loss (Figure \ref{fig-vgg7-ae}).
+
+I used the trained DAE to denoise both the training and test sets. I then trained VGG7 on the denoised trained set and recorded accuracy on the denoised test set (Figure \ref{fig-vgg7-accs} green). I compared this to training VGG7 on the original training set and predicting on the original test set (Figure \ref{fig-vgg7-accs} red).
+
+\begin{figure}
+\centering
+\includegraphics[width=3in]{../plots/vgg7-accs.png}
+\caption{\label{fig-vgg7-accs} Test accuracy of VGG7 trained without denoising or pretraining (red), with denoised data (green), and with weights pretrained from a DAE (blue).}
+\end{figure}
+
+In addition, I also trained VGG7 on non-denoised data but where the weights in the five convolutional layers are initialized to the weights of the encoder of the DAE discussed above (Figure \ref{fig-vgg7-accs}). Pretraining made very little difference; it speeds up convergence by only a couple of epochs. Using denoised data actually worsened performance. The reason for this is unclear.
+
+
+\section{Using a denoising autoencoder to improve VGG16}
+
+I repeated all of the above but with VGG16. I implemented a DAE whose encoder part has the same architecture as VGG16 but without the fully-connected layers or last max pooling. During training, it failed to achieve a reasonably low test loss-- around 500 (Figure \ref{fig-vgg16-ae}). The reason for this is probably the four max pooling layers in the DAE encoder; it is difficult to invert these, resulting in poor reconstruction.
+
+\begin{figure}
+\centering
+\includegraphics[width=3in]{../plots/vgg16-ae-losses.png}
+\caption{\label{fig-vgg16-ae} Test $L_2$ loss per image while training a DAE for later use in VGG16.}
+\end{figure}
+
+I trained VGG16 from scratch as well as on denoised data and with weights pretrained with the DAE weights-- just as I did with VGG7. Interestingly, VGG16 from scratch trained very well-- unlike in Project 3. But VGG16 on denoised data failed to train; this is unsurprising since the DAE achieved poor reconstruction loss. VGG16 with pretrained weights appears to exhibit similar training patterns to VGG16 from scratch for about the first 30 epochs, but then training is halted due to early stopping. I conclude from this that pretraining did not help.
+
+\begin{figure}
+\centering
+\includegraphics[width=3in]{../plots/vgg16-accs.png}
+\caption{\label{fig-vgg16-accs} Test accuracy of VGG16 trained without denoising or pretraining (red), with denoised data (green), and with weights pretrained from a DAE (blue).}
+\end{figure}
+
+
+\section{Exposition on stacked denoising autoencoders}
+
+Supervised learning refers to the task of infering a mapping from inputs to outputs (i.e., targets) given labeled data. In contrast, unsupervised learning refers to the task of infering some structure about the distribution of data; this is independent of the labeling of the data. Knowledge about the distribution of the data can help reduce the number of model parameters (e.g., if we know the data lies in very low dimensions) or provide good initialization of these parameters for subsequent supervised training. For example, if we have a deep neural network, we can first pretrain it as a stacked denoising autoencoder; we think of each layer as the encoder portion of an autoencoder so that the encoded output of each autoencoder is fed as input to the next autoencoder. This method is unsupervised as it makes no use of the labels. Once this is done, the network already carries information arranged in a hierarchy that can be used to reconstruct the data. This method therefore provides good weight initialization for the network. The weights can then be fine-tuned through supervised training. Pretraining was useful as it allowed deeper architectures to be trained. But pretraining fell out of fashion after the advent of relu, dropout, and batch normalization. The latter techniques allowed for training of deep architectures without having to go through costly pretraining. Variational autoencoders (VAEs) were introduced in the paper ``Autoencoding variational Bayes'' by D.P. Kingma (2013). A VAE is an autoencoder but where the encoding is stochastic. Every possible encoding of an input is weighted by a probability. Reconstruction is therefore done by integrating the decoder over all encodings with respect to their distribution. VAEs therefore fit most naturally in the context of variational inference in Bayesian probability theory; to make a VAE, we interpret the variational distribution (used to approximate the posterior) by the encoder network, and we interpret the likelihood function as the decoder.
+
+\end{document}
